@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AdminProvider } from "@/app/context/AdminContext";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import Script from "next/script"; // Pastikan ini di-import di atas
 import "./globals.css";
@@ -52,7 +51,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased transition-colors duration-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AdminProvider>{children}</AdminProvider>
+          {children}
         </ThemeProvider>
         <Script
           src="https://app.sandbox.midtrans.com/snap/snap.js"

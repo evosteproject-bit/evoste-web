@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAdmin } from "@/app/context/AdminContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "@/services/firebaseConfig";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { db, auth } from "@/services/firebaseConfig";
 
 interface Transaction {
   id: string;
@@ -16,7 +16,7 @@ interface Transaction {
   items: any[];
 }
 
-// Ikon
+// Ikon Antarmuka
 const Icons = {
   Total: () => (
     <svg
@@ -97,7 +97,9 @@ const Icons = {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { admin, loading: authLoading, logout } = useAdmin();
+  const [admin, setAdmin] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -109,18 +111,37 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Proteksi Rute Klien & Validasi Sesi Firebase
   useEffect(() => {
-    if (!authLoading && !admin) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setAdmin(user);
+      } else {
+        setAdmin(null);
+        router.push("/admin/login");
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Eksekusi Logout
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
       router.push("/admin/login");
+    } catch (error) {
+      console.error("Gagal melakukan logout:", error);
     }
-  }, [admin, authLoading, router]);
+  };
 
   // Reset pagination ke halaman 1 setiap kali filter berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [filter]);
 
-  // Firestore listener
+  // Listener Firestore untuk Data Transaksi
   useEffect(() => {
     if (!admin) return;
 
@@ -136,7 +157,7 @@ export default function AdminDashboard() {
       setTransactions(newTransactions);
       setLoading(false);
 
-      // Notifikasi
+      // Notifikasi Transaksi Baru
       newTransactions.forEach((tx) => {
         if (
           tx.status === "settlement" &&
@@ -227,12 +248,12 @@ export default function AdminDashboard() {
                 EVOSTE Portal
               </h1>
               <p className="text-sm text-slate-500 font-medium">
-                Welcome back, {admin.name}
+                Sesi Aktif: {admin.email}
               </p>
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="text-sm font-medium text-white hover:text-rose-600 px-4 py-2 rounded-lg hover:bg-rose-50 transition-colors"
           >
             Sign Out
