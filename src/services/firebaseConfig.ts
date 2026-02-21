@@ -1,20 +1,22 @@
-// /lib/firebaseConfig.ts
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // Impor modul Authentication
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDk7jZrT7eArI4FD2emfRuiduJfqxHPuZA",
-  authDomain: "evoste1.firebaseapp.com",
-  projectId: "evoste1",
-  storageBucket: "evoste1.firebasestorage.app",
-  messagingSenderId: "760732382908",
-  appId: "1:760732382908:web:36f5abfa090488511c02b9",
-  measurementId: "G-068Y13YSNY"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Inisialisasi Firebase (Mencegah inisialisasi ganda pada Next.js)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// ✅ Hanya Firestore, tidak perlu Auth
+// Inisialisasi Layanan
 const db = getFirestore(app);
+const auth = getAuth(app); // Inisialisasi variabel auth
 
-export { app, db };
+// Ekspor layanan secara eksplisit
+export { app, db, auth };
