@@ -76,7 +76,7 @@ export default function CheckoutPage() {
     try {
       const payload = {
         cart: cartItems,
-        orderId: `EVO-${Date.now()}`,
+        orderId: `order-${Date.now()}`,
         customerDetails: formData,
       };
 
@@ -98,9 +98,9 @@ export default function CheckoutPage() {
           onPending: function () {
             router.push("/checkout/success");
           },
-          onError: function () {
-            setLoading(false);
-            alert("Terjadi kesalahan pada pembayaran.");
+          onError: function (result: any) {
+            console.error("Payment Error:", result);
+            router.push("/checkout/failed");
           },
           onClose: function () {
             setLoading(false);
