@@ -11,17 +11,16 @@ import FilosofiSection from "@/components/sections/FilosofiSection";
 export default function Home() {
   return (
     <>
-      <Header />
       <main>
+        <Header />
         <HeroSection />
         <QuizSection />
         <ShopSection />
         <AboutSection />
         <HistorySection />
         <FilosofiSection />
+        <Footer />
       </main>
-      <Footer />
-      <FloatingCTA />
     </>
   );
 }

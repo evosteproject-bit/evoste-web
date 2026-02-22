@@ -5,7 +5,12 @@ import { db } from "@/services/firebaseConfig";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { cart = [], orderId = `order-${Date.now()}` } = body;
+    // Tangkap data customerDetails dari request body
+    const {
+      cart = [],
+      orderId = `order-${Date.now()}`,
+      customerDetails,
+    } = body;
 
     const item_details = cart.map((it: any, idx: number) => {
       const price =
@@ -26,12 +31,14 @@ export async function POST(req: Request) {
       0,
     );
 
+    // Simpan data pesanan berserta data pelanggan ke Firestore
     const orderRef = doc(db, "orders", orderId);
     await setDoc(orderRef, {
       orderId,
       items: cart,
       total: calculatedTotal,
       status: "pending",
+      customer: customerDetails || {}, // Injeksi data pelanggan
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -41,23 +48,34 @@ export async function POST(req: Request) {
       ? "https://app.midtrans.com"
       : "https://app.sandbox.midtrans.com";
 
-    // Pemanggilan mutlak dari environment variable
     const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
     if (!MIDTRANS_SERVER_KEY) {
-      console.error("Konfigurasi Server Key Midtrans tidak ditemukan.");
       return NextResponse.json(
         { error: "Server Configuration Error" },
         { status: 500 },
       );
     }
 
+    // Susun payload untuk Midtrans dengan Customer Details
     const payload = {
       transaction_details: {
         order_id: orderId,
         gross_amount: calculatedTotal,
       },
       item_details: item_details,
+      customer_details: customerDetails
+        ? {
+            first_name: customerDetails.name,
+            email: customerDetails.email,
+            phone: customerDetails.phone,
+            shipping_address: {
+              first_name: customerDetails.name,
+              phone: customerDetails.phone,
+              address: customerDetails.address,
+            },
+          }
+        : undefined,
     };
 
     const auth = Buffer.from(`${MIDTRANS_SERVER_KEY}:`).toString("base64");
@@ -73,29 +91,14 @@ export async function POST(req: Request) {
 
     const text = await res.text().catch(() => "");
     if (!res.ok) {
-      console.error(
-        "Midtrans Error Payload:",
-        JSON.stringify(payload, null, 2),
-      );
       return NextResponse.json(
-        { error: `Midtrans error: ${res.status}`, details: text || null },
+        { error: `Midtrans error`, details: text },
         { status: 502 },
       );
     }
 
-    let json: any = {};
-    try {
-      json = text ? JSON.parse(text) : {};
-    } catch (e) {
-      return NextResponse.json(
-        { error: "Midtrans invalid response", details: text },
-        { status: 502 },
-      );
-    }
-
-    return NextResponse.json(json);
+    return NextResponse.json(text ? JSON.parse(text) : {});
   } catch (err: any) {
-    console.error("Checkout Catch Error:", err);
     return NextResponse.json(
       { error: err?.message || "Unknown error" },
       { status: 500 },
