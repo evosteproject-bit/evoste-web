@@ -5,14 +5,22 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-// Komponen Internal yang menangani logika parameter pencarian
 function PendingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token");
+
+  // Mencari token dari URL atau LocalStorage
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Ambil token dari URL jika ada
+    const urlToken = searchParams.get("token");
+    // Ambil token dari storage sebagai cadangan
+    const storedToken = localStorage.getItem("latest_snap_token");
+
+    setToken(urlToken || storedToken);
+
     const isSandbox =
       process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("SB-");
     const scriptUrl = isSandbox
@@ -27,13 +35,12 @@ function PendingContent() {
     document.body.appendChild(scriptTag);
 
     return () => {
-      // Pembersihan script saat komponen hancur
       const existingScript = document.body.querySelector(
         `script[src="${scriptUrl}"]`,
       );
       if (existingScript) document.body.removeChild(existingScript);
     };
-  }, []);
+  }, [searchParams]);
 
   const handleResumePayment = () => {
     if (!token) return;
@@ -42,7 +49,10 @@ function PendingContent() {
     const snap = (window as any).snap;
     if (snap) {
       snap.pay(token, {
-        onSuccess: () => router.push("/checkout/success"),
+        onSuccess: () => {
+          localStorage.removeItem("latest_snap_token"); // Bersihkan setelah sukses
+          router.push("/checkout/success");
+        },
         onPending: () => setLoading(false),
         onError: () => router.push("/checkout/failed"),
         onClose: () => setLoading(false),
@@ -77,11 +87,12 @@ function PendingContent() {
       </h1>
 
       <p className="text-gray-600 dark:text-gray-400 mb-10 leading-relaxed text-center">
-        Pesanan Anda telah tercatat. Silakan selesaikan pembayaran sebelum masa
-        berlaku token habis.
+        Instruksi pembayaran telah dikirim. Jika Anda tidak sengaja menutup
+        jendela pembayaran, silakan klik tombol di bawah.
       </p>
 
       <div className="space-y-4">
+        {/* Tombol akan muncul karena token sekarang berhasil diambil dari localStorage */}
         {token && (
           <button
             onClick={handleResumePayment}
@@ -89,8 +100,8 @@ function PendingContent() {
             className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 disabled:opacity-70"
           >
             {loading
-              ? "Membuka Instruksi..."
-              : "Selesaikan Pembayaran Sekarang"}
+              ? "Menyiapkan Instruksi..."
+              : "Lanjutkan Pembayaran Sekarang"}
           </button>
         )}
 
@@ -105,16 +116,11 @@ function PendingContent() {
   );
 }
 
-// Komponen Utama halaman dengan Suspense Boundary
 export default function PendingPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center p-6 transition-colors duration-300">
       <Suspense
-        fallback={
-          <div className="text-gray-500 dark:text-gray-400 font-semibold animate-pulse">
-            Menyiapkan detail transaksi...
-          </div>
-        }
+        fallback={<div className="text-gray-400">Loading detail...</div>}
       >
         <PendingContent />
       </Suspense>

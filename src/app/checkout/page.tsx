@@ -89,6 +89,11 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      // ✅ SIMPAN TOKEN KE LOCALSTORAGE
+      if (data.token) {
+        localStorage.setItem("latest_snap_token", data.token);
+      }
+
       const snap = (window as any).snap;
       if (snap && data.token) {
         snap.pay(data.token, {
