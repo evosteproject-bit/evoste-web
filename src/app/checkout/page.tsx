@@ -100,8 +100,8 @@ export default function CheckoutPage() {
           onPending: function (result: any) {
             localStorage.removeItem("cart");
             window.dispatchEvent(new Event("cartUpdated"));
-            // Kirim token melalui query parameter
-            router.push(`/checkout/pending?token=${data.token}`);
+            const baseUrl = window.location.origin;
+            router.push(`${baseUrl}/checkout/pending?token=${data.token}`);
           },
           onError: function (result: any) {
             setLoading(false);
