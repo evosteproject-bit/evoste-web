@@ -21,9 +21,9 @@ function PendingContent() {
 
     setToken(urlToken || storedToken);
 
-    const isSandbox =
-      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("SB-");
-    const scriptUrl = isSandbox
+    const isProduction =
+      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("Mid-client");
+    const scriptUrl = isProduction
       ? "https://app.sandbox.midtrans.com/snap/snap.js"
       : "https://app.midtrans.com/snap/snap.js";
 

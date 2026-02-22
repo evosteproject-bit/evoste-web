@@ -32,10 +32,9 @@ export default function CheckoutPage() {
     }
 
     // 2. Injeksi Script Midtrans Snap secara dinamis
-    // Menggunakan Production URL jika Client Key tidak diawali SB-
-    const isSandbox =
+    const isProduction =
       process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("Mid-client-");
-    const scriptUrl = isSandbox
+    const scriptUrl = isProduction
       ? "https://app.sandbox.midtrans.com/snap/snap.js"
       : "https://app.midtrans.com/snap/snap.js";
 
