@@ -359,6 +359,7 @@ export default function AdminDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                  <th className="px-6 py-4">Pelanggan</th>
                   <th className="px-6 py-4">Order ID</th>
                   <th className="px-6 py-4">Date</th>
                   <th className="px-6 py-4">Items</th>
@@ -382,7 +383,7 @@ export default function AdminDashboard() {
                 ) : currentTransactions.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-12 text-center text-slate-500"
                     >
                       <p className="text-lg">No transactions found</p>
@@ -413,6 +414,11 @@ export default function AdminDashboard() {
                         transition={{ delay: i * 0.03 }}
                         className="hover:bg-slate-50/80 transition-colors group"
                       >
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                            {tx.customer.name || "N/A"}
+                          </span>
+                        </td>
                         <td className="px-6 py-4">
                           <span className="font-mono text-sm font-medium text-slate-700 group-hover:text-slate-900">
                             {tx.orderId || "N/A"}
