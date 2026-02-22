@@ -76,7 +76,7 @@ export default function CheckoutPage() {
     try {
       const payload = {
         cart: cartItems,
-        orderId: `order-${Date.now()}`,
+        orderId: `EVO-${Date.now()}`,
         customerDetails: formData,
       };
 
@@ -87,50 +87,29 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-      if (!res.ok) {
-        throw new Error(data.error || "Gagal membuat sesi transaksi");
-      }
-
-      // Pastikan snap tersedia di window
       const snap = (window as any).snap;
-
       if (snap && data.token) {
         snap.pay(data.token, {
-          onSuccess: function (result: any) {
-            console.log("Success:", result);
-            localStorage.removeItem("cart");
-            window.dispatchEvent(new Event("cartUpdated"));
-            alert("Pembayaran Berhasil!");
-            router.push("/");
+          onSuccess: function () {
+            router.push("/checkout/success");
           },
-          onPending: function (result: any) {
-            console.log("Pending:", result);
-            alert("Menunggu pembayaran. Silakan selesaikan tagihan Anda.");
-            localStorage.removeItem("cart");
-            window.dispatchEvent(new Event("cartUpdated"));
-            router.push("/");
+          onPending: function () {
+            router.push("/checkout/success");
           },
-          onError: function (result: any) {
-            console.error("Error:", result);
-            alert("Terjadi kesalahan pada pembayaran.");
+          onError: function () {
             setLoading(false);
+            alert("Terjadi kesalahan pada pembayaran.");
           },
           onClose: function () {
-            console.log(
-              "Customer closed the popup without finishing the payment",
-            );
             setLoading(false);
           },
         });
       } else if (data.redirect_url) {
-        // Fallback jika Snap Popup gagal terbuka
         window.location.href = data.redirect_url;
-      } else {
-        throw new Error("Sistem pembayaran tidak merespons. Coba lagi nanti.");
       }
     } catch (error: any) {
-      console.error("Checkout Error:", error);
       alert(error.message || "Terjadi kesalahan sistem.");
       setLoading(false);
     }
