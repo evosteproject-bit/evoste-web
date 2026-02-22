@@ -92,18 +92,25 @@ export default function CheckoutPage() {
       const snap = (window as any).snap;
       if (snap && data.token) {
         snap.pay(data.token, {
-          onSuccess: function () {
+          onSuccess: function (result: any) {
+            localStorage.removeItem("cart");
+            window.dispatchEvent(new Event("cartUpdated"));
             router.push("/checkout/success");
           },
-          onPending: function () {
-            router.push("/checkout/success");
+          onPending: function (result: any) {
+            localStorage.removeItem("cart");
+            window.dispatchEvent(new Event("cartUpdated"));
+            // Kirim token melalui query parameter
+            router.push(`/checkout/pending?token=${data.token}`);
           },
           onError: function (result: any) {
-            console.error("Payment Error:", result);
+            setLoading(false);
             router.push("/checkout/failed");
           },
           onClose: function () {
+            // Pengguna menutup popup tanpa memilih metode apa pun
             setLoading(false);
+            console.log("User closed the popup without action.");
           },
         });
       } else if (data.redirect_url) {
