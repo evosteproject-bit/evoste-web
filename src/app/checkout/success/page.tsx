@@ -14,15 +14,22 @@ function SuccessContent() {
   const token = searchParams.get("token"); // Ambil token jika ada
 
   useEffect(() => {
-    // Jika status ternyata 'pending', lempar ke halaman pending
+    // 1. Tangkap status dari parameter URL Midtrans
     if (status === "pending" || status === "authorize") {
       router.replace(`/checkout/pending${token ? `?token=${token}` : ""}`);
       return;
     }
 
-    // Jika sukses (settlement/capture), bersihkan keranjang
+    // 2. Tangkap status kegagalan (Denied, Cancel, atau Expired)
+    if (status === "deny" || status === "cancel" || status === "expire") {
+      router.replace("/checkout/failed");
+      return;
+    }
+
+    // 3. Tangkap status sukses (Settlement atau Capture)
     if (status === "settlement" || status === "capture") {
       localStorage.removeItem("cart");
+      localStorage.removeItem("latest_snap_token");
       window.dispatchEvent(new Event("cartUpdated"));
     }
   }, [status, token, router]);
