@@ -6,10 +6,10 @@ export default function HeroSection() {
   return (
     <section
       id="hero"
-      className="relative flex items-center justify-center h-[80vh] min-h-[500px] overflow-hidden bg-cover bg-center"
+      className="relative flex items-center justify-center h-[80vh] min-h-[100lvh] overflow-hidden bg-cover bg-left"
       style={{ backgroundImage: "url('/home1.png')" }}
     >
-      <div className="absolute inset-0 bg-gradient-to-t from-white via-white/50 to-transparent dark:from-gray-900 dark:via-gray-900/50 dark:to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent dark:from-gray-900 dark:via-gray-900/50 dark:to-transparent transition-colors duration-300" />
       <div className="relative z-10 container mx-auto px-10 max-w-7xl text-center">
         <motion.h1
           initial={{ opacity: 0, y: -20 }}
