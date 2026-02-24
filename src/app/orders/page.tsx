@@ -14,7 +14,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/services/firebaseConfig";
-import Header from "@/components/Header"; // Integrasi Header
+import Header from "@/components/layout/Header"; // Integrasi Header
 
 const TABS = [
   { id: "All", label: "Semua" },

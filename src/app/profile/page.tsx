@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/services/firebaseConfig";
-import Header from "@/components/Header"; // Integrasi Header
+import Header from "@/components/layout/Header"; // Integrasi Header
 
 export default function UserProfilePage() {
   const router = useRouter();
