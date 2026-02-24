@@ -112,7 +112,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
           {["Catalog", "About", "History", "Philosophy"].map((item) => (
             <Link
               key={item}
-              href={`#${item.toLowerCase()}`}
+              href={`/#${item.toLowerCase()}`}
               className="hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
             >
               {item}
