@@ -204,13 +204,13 @@ export default function AdminProductsPage() {
           <table className="w-full text-left text-sm text-gray-400">
             <thead className="bg-gray-900/50 text-gray-300 uppercase text-xs border-b border-gray-700">
               <tr>
-                <th className="px-6 py-4">Produk</th>
-                <th className="px-6 py-4">Harga</th>
-                <th className="px-6 py-4">Stok</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+                <th className="px-6 py-4 text-center">Produk</th>
+                <th className="px-6 py-4 text-center">Harga</th>
+                <th className="px-6 py-4 text-center">Stok</th>
+                <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-center">
               {paginatedProducts.length === 0 ? (
                 <tr>
                   <td
@@ -257,17 +257,17 @@ export default function AdminProductsPage() {
                         {product.stock} Unit
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-3">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => openEditModal(product)}
-                          className="text-blue-400 hover:text-blue-300 font-bold transition-colors"
+                          className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
-                          className="text-rose-500 hover:text-rose-400 font-bold transition-colors"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm"
                         >
                           Hapus
                         </button>

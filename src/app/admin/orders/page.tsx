@@ -10,7 +10,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/services/firebaseConfig";
 
-// Definisi
 const TABS = [
   { id: "All", label: "Semua" },
   { id: "pending", label: "Belum Bayar" },
@@ -24,10 +23,9 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // State Modal
+  // State Modal Detail
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // State Navigasi dan Paginasi
@@ -77,7 +75,19 @@ export default function AdminOrdersPage() {
     return "unknown";
   };
 
-  // Logika Filter Tab dan Pencarian
+  // Helper Mesin Status (State Machine) untuk menentukan langkah selanjutnya
+  const getNextStatusInfo = (currentStatus: string) => {
+    const s = currentStatus?.toLowerCase();
+    // Jika pesanan lunas/sedang dikemas, tahap selanjutnya adalah Dikirim
+    if (s === "settlement" || s === "success")
+      return { nextStatus: "shipped", actionLabel: "Kirim Pesanan" };
+    // Jika pesanan sudah dikirim, tahap selanjutnya adalah Selesai (Opsional bagi admin jika pelanggan lupa klik selesai)
+    if (s === "shipped")
+      return { nextStatus: "completed", actionLabel: "Tandai Selesai" };
+    // Status lain (pending, completed, failed) tidak memiliki tombol aksi lanjutan otomatis
+    return null;
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchSearch =
@@ -93,7 +103,6 @@ export default function AdminOrdersPage() {
     });
   }, [orders, searchQuery, activeTab]);
 
-  // Logika Paginasi
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -106,36 +115,49 @@ export default function AdminOrdersPage() {
 
   const openDetailModal = (order: any) => {
     setSelectedOrder(order);
-    const category = getCategoryStatus(order.status);
-    // Jika status cancelled, pertahankan nilai aslinya di dropdown
-    setNewStatus(category === "cancelled" ? order.status : category);
     setIsModalOpen(true);
   };
 
-  const handleUpdateStatus = async () => {
-    if (!selectedOrder) return;
+  // Fungsi Pembaruan Status Satu Klik
+  const handleAdvanceStatus = async (order: any) => {
+    const nextInfo = getNextStatusInfo(order.status);
+    if (!nextInfo) return;
+
+    if (
+      !window.confirm(
+        `Konfirmasi: Ubah status pesanan ${order.orderId} menjadi "${nextInfo.actionLabel}"?`,
+      )
+    ) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const orderRef = doc(db, "orders", selectedOrder.id);
-      await updateDoc(orderRef, { status: newStatus });
+      const orderRef = doc(db, "orders", order.id);
+      await updateDoc(orderRef, { status: nextInfo.nextStatus });
 
       setOrders(
         orders.map((o) =>
-          o.id === selectedOrder.id ? { ...o, status: newStatus } : o,
+          o.id === order.id ? { ...o, status: nextInfo.nextStatus } : o,
         ),
       );
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
-      alert("Status pengiriman berhasil diperbarui.");
-      setIsModalOpen(false);
+      alert(
+        `Pesanan berhasil diperbarui ke tahap: ${nextInfo.nextStatus.toUpperCase()}`,
+      );
     } catch (error) {
-      alert("Gagal memperbarui status.");
+      alert("Terjadi kesalahan saat memperbarui status pesanan.");
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleDeleteOrder = async (id: string) => {
-    if (!confirm("Hapus pesanan ini secara permanen?")) return;
+    if (
+      !window.confirm(
+        "Peringatan: Hapus pesanan ini secara permanen dari basis data? Tindakan ini tidak dapat dibatalkan.",
+      )
+    )
+      return;
     try {
       await deleteDoc(doc(db, "orders", id));
       setOrders(orders.filter((o) => o.id !== id));
@@ -145,7 +167,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // UI Helpers
   const formatIDR = (amount: number) =>
     new Intl.NumberFormat("id-ID").format(amount);
   const formatDate = (timestamp: any) => {
@@ -215,7 +236,6 @@ export default function AdminOrdersPage() {
         Kelola Pengiriman Pesanan
       </h2>
 
-      {/* Pencarian */}
       <div className="mb-6">
         <input
           type="text"
@@ -226,7 +246,6 @@ export default function AdminOrdersPage() {
         />
       </div>
 
-      {/* Navigasi Tab Shopee Style */}
       <div className="flex overflow-x-auto border-b border-gray-700 mb-6 custom-scrollbar">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -246,20 +265,19 @@ export default function AdminOrdersPage() {
         })}
       </div>
 
-      {/* Tabel Pesanan */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-400">
             <thead className="bg-gray-900/50 text-gray-300 uppercase text-xs border-b border-gray-700">
               <tr>
-                <th className="px-6 py-4">Order ID</th>
-                <th className="px-6 py-4">Pelanggan</th>
-                <th className="px-6 py-4">Tanggal</th>
-                <th className="px-6 py-4">Status Pengiriman</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+                <th className="px-6 py-4 text-center">Order ID</th>
+                <th className="px-6 py-4 text-center">Pelanggan</th>
+                <th className="px-6 py-4 text-center">Tanggal</th>
+                <th className="px-6 py-4 text-center">Status Pengiriman</th>
+                <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-center">
               {paginatedOrders.length === 0 ? (
                 <tr>
                   <td
@@ -270,37 +288,54 @@ export default function AdminOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedOrders.map((order) => (
-                  <tr
-                    key={order.id}
-                    className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
-                  >
-                    <td className="px-6 py-4 font-mono text-cyan-400">
-                      {order.orderId}
-                    </td>
-                    <td className="px-6 py-4">
-                      {order.customerDetails?.name || "-"}
-                    </td>
-                    <td className="px-6 py-4">{formatDate(order.createdAt)}</td>
-                    <td className="px-6 py-4">
-                      {renderStatusBadge(order.status)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => openDetailModal(order)}
-                        className="px-3 py-1.5 bg-gray-700 hover:bg-cyan-600 text-white rounded text-xs font-bold transition-colors border border-gray-600 hover:border-cyan-500"
-                      >
-                        Periksa & Update
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                paginatedOrders.map((order) => {
+                  const nextStatusInfo = getNextStatusInfo(order.status);
+
+                  return (
+                    <tr
+                      key={order.id}
+                      className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
+                    >
+                      <td className="px-6 py-4 font-mono text-cyan-400">
+                        {order.orderId}
+                      </td>
+                      <td className="px-6 py-4">
+                        {order.customerDetails?.name || "-"}
+                      </td>
+                      <td className="px-6 py-4">
+                        {formatDate(order.createdAt)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {renderStatusBadge(order.status)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => openDetailModal(order)}
+                            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-xs font-bold transition-colors border border-gray-600 shadow-sm"
+                          >
+                            Detail
+                          </button>
+
+                          {nextStatusInfo && (
+                            <button
+                              onClick={() => handleAdvanceStatus(order)}
+                              disabled={isProcessing}
+                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              {nextStatusInfo.actionLabel}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Paginasi */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-4 bg-gray-900/50 border-t border-gray-700">
             <span className="text-sm text-gray-400">
@@ -328,17 +363,15 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Modal Detail & Update Status Pengiriman */}
+      {/* Modal Detail Pesanan Saja */}
       {isModalOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-gray-800 z-10">
-              <h3 className="text-xl font-bold text-white">
-                Detail Pengiriman
-              </h3>
+              <h3 className="text-xl font-bold text-white">Rincian Pesanan</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white font-bold"
               >
                 ✕
               </button>
@@ -347,7 +380,7 @@ export default function AdminOrdersPage() {
             <div className="p-6 space-y-6">
               <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
                 <h4 className="text-sm font-bold text-gray-400 mb-3 uppercase">
-                  Alamat Tujuan
+                  Informasi Pelanggan & Pengiriman
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -363,8 +396,14 @@ export default function AdminOrdersPage() {
                     </p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-gray-500">Alamat Lengkap</p>
+                    <p className="text-gray-500">Email Utama</p>
                     <p className="text-white font-medium">
+                      {selectedOrder.customerDetails?.email}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-gray-500">Alamat Lengkap</p>
+                    <p className="text-white font-medium leading-relaxed">
                       {selectedOrder.customerDetails?.address}
                     </p>
                   </div>
@@ -373,7 +412,7 @@ export default function AdminOrdersPage() {
 
               <div>
                 <h4 className="text-sm font-bold text-gray-400 mb-3 uppercase">
-                  Barang yang harus dikemas
+                  Daftar Barang
                 </h4>
                 <div className="space-y-3">
                   {selectedOrder.cart.map((item: any, idx: number) => (
@@ -387,60 +426,33 @@ export default function AdminOrdersPage() {
                           Kuantitas: {item.quantity || 1}
                         </p>
                       </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-cyan-400">
+                          Rp{" "}
+                          {formatIDR(
+                            Number(String(item.price).replace(/\./g, "")) *
+                              (item.quantity || 1),
+                          )}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="border-t border-gray-700 pt-6">
-                <h4 className="text-sm font-bold text-gray-400 mb-3 uppercase">
-                  Pembaruan Status
-                </h4>
-                <div className="flex flex-col sm:flex-row gap-4 items-end">
-                  <div className="flex-1 w-full">
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Status Pengiriman Saat Ini
-                    </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded focus:ring-cyan-500 focus:border-cyan-500 block p-3 outline-none"
-                    >
-                      <option value="pending" disabled>
-                        Belum Bayar (Menunggu Pelanggan)
-                      </option>
-                      <option value="settlement">
-                        Sedang Dikemas (Pembayaran Valid)
-                      </option>
-                      <option value="shipped">
-                        Dikirim (Pesanan diserahkan ke kurir)
-                      </option>
-                      <option value="completed">
-                        Selesai (Pesanan diterima)
-                      </option>
-                      <option value="cancel">Dibatalkan</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={handleUpdateStatus}
-                    disabled={
-                      isProcessing ||
-                      newStatus === getCategoryStatus(selectedOrder.status)
-                    }
-                    className="w-full sm:w-auto px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold rounded disabled:opacity-50 transition-colors"
-                  >
-                    Simpan Perubahan
-                  </button>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-700/50 flex justify-end">
-                  <button
-                    onClick={() => handleDeleteOrder(selectedOrder.id)}
-                    className="text-xs font-bold text-rose-500 hover:text-rose-400 transition-colors"
-                  >
-                    Hapus Data Pesanan
-                  </button>
-                </div>
+              <div className="mt-6 pt-4 border-t border-gray-700/50 flex justify-between items-center">
+                <button
+                  onClick={() => handleDeleteOrder(selectedOrder.id)}
+                  className="text-xs font-bold text-rose-500 hover:text-rose-400 transition-colors py-2"
+                >
+                  Hapus Pesanan Permanen
+                </button>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold rounded transition-colors"
+                >
+                  Tutup Rincian
+                </button>
               </div>
             </div>
           </div>

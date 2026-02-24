@@ -5,43 +5,29 @@ import {
   collection,
   getDocs,
   doc,
-  deleteDoc,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/services/firebaseConfig";
 
-interface UserProfile {
-  id: string; // Document ID (Sama dengan Auth UID)
-  name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  role?: string;
-  createdAt?: any;
-}
+const TABS = [
+  { id: "CUSTOMER", label: "Pelanggan" },
+  { id: "ADMIN", label: "Administrator" },
+];
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // State Modal
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // State Form Edit
-  const [editForm, setEditForm] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    role: "customer",
-  });
-
-  // State Paginasi dan Filter
+  const [activeTab, setActiveTab] = useState("CUSTOMER");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [newRole, setNewRole] = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -51,39 +37,43 @@ export default function AdminUsersPage() {
     setLoading(true);
     try {
       const querySnapshot = await getDocs(collection(db, "users"));
-      const data: UserProfile[] = [];
+      const data: any[] = [];
       querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as UserProfile);
+        data.push({ id: doc.id, ...doc.data() });
       });
-      // Urutkan berdasarkan tanggal dibuat (terbaru)
       data.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+        const dateA = a.createdAt?.toDate
+          ? a.createdAt.toDate().getTime()
+          : new Date(a.createdAt || 0).getTime();
+        const dateB = b.createdAt?.toDate
+          ? b.createdAt.toDate().getTime()
+          : new Date(b.createdAt || 0).getTime();
         return dateB - dateA;
       });
       setUsers(data);
     } catch (error) {
-      console.error("Gagal memuat pengguna:", error);
+      console.error("Gagal memuat data pengguna:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Logika Filter dan Pencarian
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      const searchLower = searchQuery.toLowerCase();
       const matchSearch =
-        (user.name?.toLowerCase() || "").includes(searchLower) ||
-        (user.email?.toLowerCase() || "").includes(searchLower);
+        (user.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.email || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchRole = filterRole === "All" || user.role === filterRole;
+      const role = (user.role || "customer").toUpperCase();
+      const isAdmin = role === "ADMIN";
+      const isCustomer = role !== "ADMIN";
 
-      return matchSearch && matchRole;
+      const matchTab = activeTab === "ADMIN" ? isAdmin : isCustomer;
+
+      return matchSearch && matchTab;
     });
-  }, [users, searchQuery, filterRole]);
+  }, [users, searchQuery, activeTab]);
 
-  // Logika Paginasi
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -92,66 +82,39 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterRole]);
+  }, [searchQuery, activeTab]);
 
-  const openDetailModal = (user: UserProfile) => {
+  const openEditModal = (user: any) => {
     setSelectedUser(user);
-    setEditForm({
-      name: user.name || "",
-      phone: user.phone || "",
-      address: user.address || "",
-      role: user.role || "customer",
-    });
+    setNewRole((user.role || "customer").toLowerCase());
     setIsModalOpen(true);
   };
 
-  const handleUpdateUser = async () => {
+  const handleUpdateRole = async () => {
     if (!selectedUser) return;
     setIsProcessing(true);
     try {
       const userRef = doc(db, "users", selectedUser.id);
-      await updateDoc(userRef, {
-        name: editForm.name,
-        phone: editForm.phone,
-        address: editForm.address,
-        role: editForm.role,
-      });
+      await updateDoc(userRef, { role: newRole });
 
-      // Sinkronisasi status lokal
       setUsers(
         users.map((u) =>
-          u.id === selectedUser.id ? { ...u, ...editForm } : u,
+          u.id === selectedUser.id ? { ...u, role: newRole } : u,
         ),
       );
-      setSelectedUser({ ...selectedUser, ...editForm });
-      alert("Data pengguna berhasil diperbarui.");
       setIsModalOpen(false);
+      alert("Otoritas pengguna berhasil diperbarui.");
     } catch (error) {
-      alert("Gagal memperbarui data pengguna.");
+      alert("Gagal memperbarui otoritas pengguna.");
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteUser = async (id: string) => {
-    if (
-      !confirm(
-        "PERINGATAN: Menghapus data ini akan melumpuhkan profil pengguna terkait secara permanen. Lanjutkan?",
-      )
-    )
-      return;
-    try {
-      await deleteDoc(doc(db, "users", id));
-      setUsers(users.filter((u) => u.id !== id));
-      setIsModalOpen(false);
-    } catch (error) {
-      alert("Gagal menghapus pengguna.");
     }
   };
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "Tidak diketahui";
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return "Format tidak valid";
     return new Intl.DateTimeFormat("id-ID", {
       day: "2-digit",
       month: "short",
@@ -162,7 +125,7 @@ export default function AdminUsersPage() {
   if (loading)
     return (
       <div className="text-cyan-400 font-orbitron animate-pulse">
-        Memuat basis data pengguna...
+        Memuat data pengguna...
       </div>
     );
 
@@ -170,32 +133,35 @@ export default function AdminUsersPage() {
     <div>
       <h2 className="text-2xl font-bold text-white mb-6">Manajemen Pengguna</h2>
 
-      {/* Kontrol Filter & Pencarian */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center bg-gray-800 p-4 rounded-xl border border-gray-700">
-        <div className="w-full md:w-1/3">
-          <input
-            type="text"
-            placeholder="Cari Nama atau Email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5 outline-none"
-          />
-        </div>
-        <div className="w-full md:w-1/4 flex items-center gap-3">
-          <span className="text-sm text-gray-400 font-medium">Otoritas:</span>
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5 outline-none"
-          >
-            <option value="All">Semua Peran</option>
-            <option value="customer">Customer</option>
-            <option value="admin">Administrator</option>
-          </select>
-        </div>
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Cari Nama Lengkap atau Email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full md:w-1/2 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-3 outline-none"
+        />
       </div>
 
-      {/* Tabel Pengguna */}
+      <div className="flex overflow-x-auto border-b border-gray-700 mb-6 custom-scrollbar">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`whitespace-nowrap px-6 py-3 text-sm font-semibold transition-colors border-b-2 ${
+                isActive
+                  ? "border-cyan-500 text-cyan-400"
+                  : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-400">
@@ -203,201 +169,168 @@ export default function AdminUsersPage() {
               <tr>
                 <th className="px-6 py-4">Nama Lengkap</th>
                 <th className="px-6 py-4">Email / Kontak</th>
-                <th className="px-6 py-4">Terdaftar</th>
-                <th className="px-6 py-4">Peran (Role)</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+                {/* Isolasi Kolom Terdaftar untuk Tab Admin */}
+                {activeTab === "CUSTOMER" && (
+                  <th className="px-6 py-4 text-center">Terdaftar</th>
+                )}
+                <th className="px-6 py-4 text-center">Peran (Role)</th>
+                {/* Isolasi Kolom Aksi untuk Tab Admin */}
+                {activeTab === "CUSTOMER" && (
+                  <th className="px-6 py-4 text-center">Aksi</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {paginatedUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
+                    colSpan={activeTab === "CUSTOMER" ? 5 : 3}
+                    className="px-6 py-12 text-center text-gray-500"
                   >
-                    Tidak ada data pengguna yang sesuai.
+                    Tidak ada data pengguna di kategori ini.
                   </td>
                 </tr>
               ) : (
-                paginatedUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
-                  >
-                    <td className="px-6 py-4 font-medium text-white">
-                      {user.name || "Anonim"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-cyan-400">{user.email}</div>
-                      <div className="text-xs text-gray-500">
-                        {user.phone || "Tidak ada telepon"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">{formatDate(user.createdAt)}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          user.role === "admin"
-                            ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                            : "bg-gray-700 text-gray-300"
-                        }`}
-                      >
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => openDetailModal(user)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                paginatedUsers.map((user) => {
+                  const role = (user.role || "customer").toUpperCase();
+                  const isAdmin = role === "ADMIN";
+
+                  return (
+                    <tr
+                      key={user.id}
+                      className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
+                    >
+                      <td className="px-6 py-4 font-bold text-white">
+                        {user.name || "Anonim"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-cyan-400">{user.email || "-"}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {user.phone || "Tidak ada telepon"}
+                        </p>
+                      </td>
+                      {/* Render Kondisional untuk Baris Terdaftar */}
+                      {activeTab === "CUSTOMER" && (
+                        <td className="px-6 py-4 text-center">
+                          {formatDate(user.createdAt)}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 text-center">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                            isAdmin
+                              ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                              : "bg-gray-600/50 text-gray-300 border border-gray-500/30"
+                          }`}
+                        >
+                          {role}
+                        </span>
+                      </td>
+                      {/* Render Kondisional untuk Baris Aksi */}
+                      {activeTab === "CUSTOMER" && (
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openEditModal(user)}
+                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Paginasi */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-4 bg-gray-900/50 border-t border-gray-700">
             <span className="text-sm text-gray-400">
-              Menampilkan {(currentPage - 1) * itemsPerPage + 1} hingga{" "}
-              {Math.min(currentPage * itemsPerPage, filteredUsers.length)} dari{" "}
-              {filteredUsers.length} pengguna
+              Hal {currentPage} dari {totalPages}
             </span>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1 bg-gray-800 text-white rounded border border-gray-600 hover:bg-gray-700 disabled:opacity-50"
+                className="px-3 py-1 bg-gray-800 text-white rounded border border-gray-600 hover:bg-gray-700 disabled:opacity-50 text-xs font-bold"
               >
-                Prev
+                Sebelumnya
               </button>
               <button
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 bg-gray-800 text-white rounded border border-gray-600 hover:bg-gray-700 disabled:opacity-50"
+                className="px-3 py-1 bg-gray-800 text-white rounded border border-gray-600 hover:bg-gray-700 disabled:opacity-50 text-xs font-bold"
               >
-                Next
+                Selanjutnya
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal Detail & Edit */}
       {isModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="p-6 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-gray-800 z-10">
-              <h3 className="text-xl font-bold text-white">
-                Kelola Profil Pengguna
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+              <h3 className="text-lg font-bold text-white">
+                Edit Otoritas Pengguna
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white font-bold"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">
-                  Email (Kredensial)
-                </label>
-                <input
-                  type="email"
-                  value={selectedUser.email || ""}
-                  disabled
-                  readOnly
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-600 bg-gray-900 text-gray-500 cursor-not-allowed outline-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Email tidak dapat diubah dari sisi aplikasi klien.
-                </p>
+              <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <p className="text-sm text-gray-400">Nama</p>
+                <p className="font-bold text-white mb-2">{selectedUser.name}</p>
+                <p className="text-sm text-gray-400">Email</p>
+                <p className="font-bold text-cyan-400">{selectedUser.email}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1">
-                  Nama Lengkap
-                </label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, name: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-600 bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1">
-                  Nomor Telepon
-                </label>
-                <input
-                  type="tel"
-                  value={editForm.phone}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, phone: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-600 bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1">
-                  Alamat Utama
-                </label>
-                <textarea
-                  rows={3}
-                  value={editForm.address}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, address: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-600 bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all resize-none"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-gray-700">
-                <label className="block text-sm font-bold text-rose-400 mb-2 uppercase tracking-wide">
-                  Otorisasi Sistem (Role)
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Tingkat Peran (Role)
                 </label>
                 <select
-                  value={editForm.role}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, role: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-600 bg-gray-900 text-white focus:ring-2 focus:ring-rose-500 outline-none transition-all"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-3 outline-none"
                 >
-                  <option value="customer">Customer (Akses Terbatas)</option>
-                  <option value="admin">Administrator (Akses Penuh)</option>
+                  <option value="customer">Customer (Akses Publik)</option>
+                  <option value="admin">Administrator (Akses Dasbor)</option>
                 </select>
-                <p className="text-xs text-gray-400 mt-2">
-                  Peringatan: Memberikan status administrator akan mengizinkan
-                  pengguna mengakses dasbor ini.
+                <p className="text-xs text-gray-500 mt-2">
+                  Peringatan: Memberikan akses administrator akan mengizinkan
+                  pengguna ini mengubah data sistem Anda.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-700 mt-4">
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-700">
                 <button
-                  onClick={() => handleDeleteUser(selectedUser.id)}
-                  className="px-4 py-2.5 bg-transparent border border-rose-500/50 text-rose-500 hover:bg-rose-500 hover:text-white font-bold rounded-lg transition-colors flex-1"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-transparent text-gray-300 hover:text-white font-bold text-sm transition-colors"
                 >
-                  Hapus Profil
+                  Batal
                 </button>
                 <button
-                  onClick={handleUpdateUser}
-                  disabled={isProcessing}
-                  className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg transition-colors flex-[2] disabled:opacity-50"
+                  onClick={handleUpdateRole}
+                  disabled={
+                    isProcessing ||
+                    newRole === (selectedUser.role || "customer").toLowerCase()
+                  }
+                  className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm rounded-lg disabled:opacity-50 transition-colors shadow-md"
                 >
-                  {isProcessing ? "Menyimpan..." : "Simpan Perubahan"}
+                  Simpan Peran
                 </button>
               </div>
             </div>
