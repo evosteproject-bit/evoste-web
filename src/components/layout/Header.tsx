@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,23 +28,28 @@ interface HeaderProps {
 export default function Header({ showCartNotification }: HeaderProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // State Navigasi Dropdown
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const { theme, setTheme } = useTheme();
   const isDarkMode = theme === "dark";
 
+  // Referensi Elemen untuk Click-Outside Detection
+  const cartRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     setMounted(true);
-
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
-
     return () => unsubscribeAuth();
   }, []);
 
@@ -60,6 +65,64 @@ export default function Header({ showCartNotification }: HeaderProps) {
     window.addEventListener("cartUpdated", loadCart);
     return () => window.removeEventListener("cartUpdated", loadCart);
   }, []);
+
+  // Logika Deteksi Klik di Luar Area
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      // Evaluasi penutupan Profil
+      if (
+        isProfileOpen &&
+        profileRef.current &&
+        !profileRef.current.contains(target)
+      ) {
+        setIsProfileOpen(false);
+      }
+
+      // Evaluasi penutupan Keranjang (Mengecualikan tombol toggle agar tidak tumpang tindih)
+      if (isCartOpen && cartRef.current && !cartRef.current.contains(target)) {
+        const toggleBtn = document.getElementById("cart-toggle-btn");
+        if (toggleBtn && !toggleBtn.contains(target)) {
+          setIsCartOpen(false);
+        }
+      }
+
+      // Evaluasi penutupan Menu Mobile
+      if (
+        isMenuOpen &&
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(target)
+      ) {
+        const mobileBtn = document.getElementById("mobile-menu-btn");
+        if (mobileBtn && !mobileBtn.contains(target)) {
+          setIsMenuOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isCartOpen, isProfileOpen, isMenuOpen]);
+
+  // Logika Eksklusivitas State (Saling Menutup)
+  const toggleCart = () => {
+    setIsCartOpen(!isCartOpen);
+    setIsProfileOpen(false);
+    setIsMenuOpen(false);
+  };
+
+  const toggleProfile = () => {
+    setIsProfileOpen(!isProfileOpen);
+    setIsCartOpen(false);
+    setIsMenuOpen(false);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+    setIsCartOpen(false);
+    setIsProfileOpen(false);
+  };
 
   const handleRemoveItem = (id: string | number) => {
     const updated = cartItems.filter((item) => item.id !== id);
@@ -95,7 +158,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
 
   const getTotal = () => {
     return cartItems.reduce((acc, item) => {
-      // Abaikan kalkulasi untuk item yang stoknya habis
       if ((item.stock || 0) <= 0) return acc;
       const cleanPrice = Number(String(item.price).replace(/\./g, ""));
       return acc + cleanPrice * (item.quantity || 1);
@@ -130,7 +192,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
     }
   };
 
-  // Evaluasi ada tidaknya item yang stoknya habis di keranjang
   const hasOutOfStockItems = cartItems.some((item) => (item.stock || 0) <= 0);
 
   return (
@@ -138,12 +199,16 @@ export default function Header({ showCartNotification }: HeaderProps) {
       <div className="container mx-auto px-6 max-w-7xl h-20 flex items-center justify-between">
         <Link
           href="/"
+          onClick={() => {
+            setIsCartOpen(false);
+            setIsProfileOpen(false);
+            setIsMenuOpen(false);
+          }}
           className="text-2xl font-black tracking-widest text-blue-600 dark:text-cyan-300 font-orbitron"
         >
           EVOSTE
         </Link>
 
-        {/* Desktop Navigasi dengan Rute Absolut */}
         <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-700 dark:text-gray-300">
           {["Catalog", "About", "History", "Philosophy"].map((item) => (
             <Link
@@ -158,8 +223,9 @@ export default function Header({ showCartNotification }: HeaderProps) {
 
         <div className="flex items-center gap-6 relative">
           <button
+            id="cart-toggle-btn"
             className="relative p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
-            onClick={() => setIsCartOpen(!isCartOpen)}
+            onClick={toggleCart}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -221,11 +287,11 @@ export default function Header({ showCartNotification }: HeaderProps) {
             )}
           </button>
 
-          <div className="hidden md:block relative">
+          <div className="hidden md:block relative" ref={profileRef}>
             {currentUser ? (
               <div>
                 <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  onClick={toggleProfile}
                   className="w-9 h-9 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-full flex items-center justify-center font-bold text-sm uppercase transition-colors focus:ring-2 focus:ring-blue-500"
                 >
                   {currentUser.email?.charAt(0)}
@@ -286,8 +352,9 @@ export default function Header({ showCartNotification }: HeaderProps) {
           </div>
 
           <button
+            id="mobile-menu-btn"
             className="md:hidden p-2 dark:text-white"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={toggleMobileMenu}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -310,13 +377,13 @@ export default function Header({ showCartNotification }: HeaderProps) {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.nav
+            ref={mobileMenuRef}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-800 overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4 text-center font-medium dark:text-gray-300">
-              {/* Mobile Navigasi dengan Rute Absolut */}
               {["Catalog", "About", "History", "Philosophy"].map((item) => (
                 <Link
                   key={item}
@@ -374,6 +441,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
       <AnimatePresence>
         {isCartOpen && (
           <motion.div
+            ref={cartRef}
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -418,14 +486,9 @@ export default function Header({ showCartNotification }: HeaderProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`flex gap-4 items-start p-3 rounded-xl border ${
-                        isOutOfStock
-                          ? "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/50"
-                          : "bg-gray-50 dark:bg-slate-700/50 border-gray-100 dark:border-slate-700"
-                      }`}
+                      className={`flex gap-4 items-start p-3 rounded-xl border ${isOutOfStock ? "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/50" : "bg-gray-50 dark:bg-slate-700/50 border-gray-100 dark:border-slate-700"}`}
                     >
                       <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-600">
-                        {/* Img murni untuk bypass error URL Next.js */}
                         <img
                           src={item.image || "/logo.jpeg"}
                           alt={item.name}
@@ -481,7 +544,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
                               +
                             </button>
                           </div>
-
                           <button
                             onClick={() => handleRemoveItem(item.id)}
                             className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors ml-2"
@@ -489,7 +551,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
                             Hapus
                           </button>
                         </div>
-
                         {isOutOfStock && (
                           <p className="text-[10px] text-rose-500 font-bold mt-2">
                             Item ini tidak tersedia. Silakan hapus.
@@ -512,22 +573,15 @@ export default function Header({ showCartNotification }: HeaderProps) {
                     Rp {formatIDR(getTotal())}
                   </span>
                 </div>
-
-                {/* Tombol Checkout dinonaktifkan jika ada produk yang habis */}
                 <button
                   onClick={handleCheckoutRedirect}
                   disabled={hasOutOfStockItems}
-                  className={`w-full py-3.5 rounded-xl font-bold transition-all shadow-lg ${
-                    hasOutOfStockItems
-                      ? "bg-gray-400 text-gray-200 cursor-not-allowed shadow-none"
-                      : "bg-cyan-500 hover:bg-cyan-600 text-white shadow-cyan-500/30"
-                  }`}
+                  className={`w-full py-3.5 rounded-xl font-bold transition-all shadow-lg ${hasOutOfStockItems ? "bg-gray-400 text-gray-200 cursor-not-allowed shadow-none" : "bg-cyan-500 hover:bg-cyan-600 text-white shadow-cyan-500/30"}`}
                 >
                   {hasOutOfStockItems
                     ? "Hapus Item Habis Untuk Lanjut"
                     : "Lanjut ke Checkout"}
                 </button>
-
                 {!currentUser && !hasOutOfStockItems && (
                   <p className="text-xs text-center text-rose-500 mt-3 font-medium">
                     Anda harus login untuk melanjutkan checkout.
