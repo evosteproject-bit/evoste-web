@@ -1,76 +1,80 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/services/firebaseConfig";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const orderId = body.order_id;
+    const transactionStatus = body.transaction_status;
+    const fraudStatus = body.fraud_status;
 
-    const {
-      order_id,
-      status_code,
-      gross_amount,
-      signature_key,
-      transaction_status,
-      fraud_status,
-    } = body;
-
-    // Pemanggilan mutlak dari environment variable
-    const serverKey = process.env.MIDTRANS_SERVER_KEY;
-
-    if (!serverKey) {
-      console.error("Konfigurasi Server Key Midtrans tidak ditemukan.");
+    if (!orderId) {
       return NextResponse.json(
-        { error: "Server Configuration Error" },
-        { status: 500 },
+        { error: "Kehilangan parameter Order ID" },
+        { status: 400 },
       );
-    }
-
-    const hashString = `${order_id}${status_code}${gross_amount}${serverKey}`;
-    const expectedSignature = crypto
-      .createHash("sha512")
-      .update(hashString)
-      .digest("hex");
-
-    if (signature_key !== expectedSignature) {
-      console.error(
-        "Invalid Signature Key. Potensi serangan manipulasi data terdeteksi.",
-      );
-      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
 
     let finalStatus = "pending";
 
-    if (
-      transaction_status === "capture" ||
-      transaction_status === "settlement"
-    ) {
-      if (fraud_status === "challenge") {
-        finalStatus = "pending";
-      } else if (fraud_status === "accept" || !fraud_status) {
-        finalStatus = "settlement";
-      }
+    if (transactionStatus === "capture") {
+      if (fraudStatus === "challenge") finalStatus = "pending";
+      else if (fraudStatus === "accept") finalStatus = "settlement";
+    } else if (transactionStatus === "settlement") {
+      finalStatus = "settlement";
     } else if (
-      transaction_status === "cancel" ||
-      transaction_status === "deny" ||
-      transaction_status === "expire"
+      transactionStatus === "cancel" ||
+      transactionStatus === "deny" ||
+      transactionStatus === "expire"
     ) {
       finalStatus = "failed";
+    } else if (transactionStatus === "pending") {
+      finalStatus = "pending";
     }
 
-    const orderRef = doc(db, "orders", order_id);
-    await updateDoc(orderRef, {
-      status: finalStatus,
-      updatedAt: serverTimestamp(),
-    });
+    const orderRef = doc(db, "orders", orderId);
+    const orderSnap = await getDoc(orderRef);
 
-    return NextResponse.json({ message: "OK" }, { status: 200 });
+    if (orderSnap.exists()) {
+      const currentStatus = orderSnap.data().status;
+      const cart = orderSnap.data().cart;
+
+      if (currentStatus === "shipped" || currentStatus === "completed") {
+        return NextResponse.json(
+          { message: "Update diabaikan, pesanan sudah diproses." },
+          { status: 200 },
+        );
+      }
+
+      // LOGIKA PENGEMBALIAN STOK (RESTOCK)
+      // Jika status berubah menjadi 'failed' dan sebelumnya bukan 'failed'
+      if (finalStatus === "failed" && currentStatus !== "failed") {
+        const updatePromises = cart.map((item: any) => {
+          const productRef = doc(db, "products", item.id);
+          // Menggunakan increment untuk mengembalikan stok secara atomik
+          return updateDoc(productRef, {
+            stock: increment(item.quantity || 1),
+          });
+        });
+
+        await Promise.all(updatePromises);
+        console.log(
+          `Pengembalian stok berhasil untuk pesanan gagal: ${orderId}`,
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Dokumen pesanan tidak ditemukan." },
+        { status: 404 },
+      );
+    }
+
+    await updateDoc(orderRef, { status: finalStatus });
+
+    return NextResponse.json({ status: "success" });
   } catch (error: any) {
-    console.error("Webhook Error:", error.message);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 },
-    );
+    console.error("Webhook API Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

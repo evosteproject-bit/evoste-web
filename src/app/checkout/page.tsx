@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion } from "framer-motion";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebaseConfig";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFetchingUser, setIsFetchingUser] = useState(true);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -18,7 +21,34 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    // 1. Muat data keranjang
+    // 1. Validasi Autentikasi dan Ambil Data Profil
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/register");
+        return;
+      }
+
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          setFormData({
+            name: userData.name || "",
+            email: userData.email || user.email || "",
+            phone: userData.phone || "",
+            address: userData.address || "",
+          });
+        }
+      } catch (error) {
+        console.error("Gagal memuat profil pengguna:", error);
+      } finally {
+        setIsFetchingUser(false);
+      }
+    });
+
+    // 2. Muat Data Keranjang
     const stored = localStorage.getItem("cart");
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -31,12 +61,11 @@ export default function CheckoutPage() {
       router.push("/");
     }
 
-    // 2. Injeksi Script Midtrans Snap secara dinamis
-    const isProduction =
-      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("Mid-client-");
+    // 3. Injeksi Script Midtrans Snap
+    const isProduction = process.env.NEXT_PUBLIC_MIDTRANS_USE_PROD === "1";
     const scriptUrl = isProduction
-      ? "https://app.sandbox.midtrans.com/snap/snap.js"
-      : "https://app.midtrans.com/snap/snap.js";
+      ? "https://app.midtrans.com/snap/snap.js"
+      : "https://app.sandbox.midtrans.com/snap/snap.js";
 
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
 
@@ -48,6 +77,10 @@ export default function CheckoutPage() {
       scriptTag.setAttribute("data-client-key", clientKey);
       document.body.appendChild(scriptTag);
     }
+
+    return () => {
+      unsubscribeAuth();
+    };
   }, [router]);
 
   const getTotal = () => {
@@ -61,6 +94,7 @@ export default function CheckoutPage() {
     return new Intl.NumberFormat("id-ID").format(amount);
   };
 
+  // Hanya memproses perubahan pada input yang tidak di-disable (address)
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -75,7 +109,7 @@ export default function CheckoutPage() {
     try {
       const payload = {
         cart: cartItems,
-        orderId: `order-${Date.now()}`,
+        orderId: `EVO-${Date.now()}`,
         customerDetails: formData,
       };
 
@@ -86,39 +120,37 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
 
-      // ✅ SIMPAN TOKEN KE LOCALSTORAGE
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal membuat sesi transaksi");
+      }
+
       if (data.token) {
         localStorage.setItem("latest_snap_token", data.token);
       }
 
       const snap = (window as any).snap;
+
       if (snap && data.token) {
         snap.pay(data.token, {
-          onSuccess: function (result: any) {
-            localStorage.removeItem("cart");
-            window.dispatchEvent(new Event("cartUpdated"));
+          onSuccess: function () {
             router.push("/checkout/success");
           },
-          onPending: function (result: any) {
-            localStorage.removeItem("cart");
-            window.dispatchEvent(new Event("cartUpdated"));
+          onPending: function () {
             const baseUrl = window.location.origin;
             router.push(`${baseUrl}/checkout/pending?token=${data.token}`);
           },
-          onError: function (result: any) {
-            setLoading(false);
+          onError: function () {
             router.push("/checkout/failed");
           },
           onClose: function () {
-            // Pengguna menutup popup tanpa memilih metode apa pun
             setLoading(false);
-            console.log("User closed the popup without action.");
           },
         });
       } else if (data.redirect_url) {
         window.location.href = data.redirect_url;
+      } else {
+        throw new Error("Sistem pembayaran tidak merespons. Coba lagi nanti.");
       }
     } catch (error: any) {
       alert(error.message || "Terjadi kesalahan sistem.");
@@ -126,12 +158,18 @@ export default function CheckoutPage() {
     }
   };
 
-  if (cartItems.length === 0) return null;
+  // Mencegah rendering form yang berkedip sebelum data profil tiba
+  if (cartItems.length === 0 || isFetchingUser) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center pt-28 pb-12">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] pt-28 pb-12 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Kolom Form Data Diri */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -143,18 +181,19 @@ export default function CheckoutPage() {
             onSubmit={handleSubmit}
             className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 space-y-6"
           >
+            {/* Input Terkunci (Read-Only) */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Nama Lengkap
               </label>
               <input
                 required
+                disabled
+                readOnly
                 type="text"
                 name="name"
                 value={formData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-gray-400"
-                placeholder="John Doe"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none transition-all"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -164,12 +203,12 @@ export default function CheckoutPage() {
                 </label>
                 <input
                   required
+                  disabled
+                  readOnly
                   type="email"
                   name="email"
                   value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-gray-400"
-                  placeholder="john@example.com"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none transition-all"
                 />
               </div>
               <div>
@@ -178,18 +217,20 @@ export default function CheckoutPage() {
                 </label>
                 <input
                   required
+                  disabled
+                  readOnly
                   type="tel"
                   name="phone"
                   value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-gray-400"
-                  placeholder="08123456789"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none transition-all"
                 />
               </div>
             </div>
+
+            {/* Input Terbuka (Dapat Diedit) */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Alamat Lengkap
+                Alamat Pengiriman (Dapat diubah)
               </label>
               <textarea
                 required
@@ -197,10 +238,15 @@ export default function CheckoutPage() {
                 value={formData.address}
                 onChange={handleInputChange}
                 rows={4}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none placeholder-gray-400"
-                placeholder="Jl. Contoh Raya No. 123..."
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                placeholder="Tentukan detail alamat pengiriman untuk pesanan ini..."
               />
+              <p className="text-xs text-gray-500 mt-2">
+                *Perubahan alamat di sini hanya berlaku untuk pesanan ini dan
+                tidak mengubah alamat profil utama Anda.
+              </p>
             </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -213,7 +259,6 @@ export default function CheckoutPage() {
           </form>
         </motion.div>
 
-        {/* Kolom Ringkasan Pesanan */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -226,12 +271,14 @@ export default function CheckoutPage() {
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
               {cartItems.map((item) => (
                 <div key={item.id} className="flex gap-4 items-center">
-                  <div className="relative w-20 h-20 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 overflow-hidden shrink-0">
-                    <Image
-                      src={item.image}
+                  <div className="relative w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-lg overflow-hidden shrink-0">
+                    <img
+                      src={item.image || "/logo.jpeg"}
                       alt={item.name}
-                      fill
-                      className="object-contain p-2"
+                      className="object-contain w-full h-full absolute inset-0 p-2"
+                      onError={(e) => {
+                        e.currentTarget.src = "/logo.jpeg";
+                      }}
                     />
                   </div>
                   <div className="flex-1">

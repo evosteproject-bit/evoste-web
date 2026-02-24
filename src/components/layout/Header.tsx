@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { Product } from "@/lib/data";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
+import { auth } from "@/services/firebaseConfig";
 
 export interface CartItem extends Product {
   quantity?: number;
@@ -23,15 +25,23 @@ export default function Header({ showCartNotification }: HeaderProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // State Autentikasi dan Profil
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   const { theme, setTheme } = useTheme();
   const isDarkMode = theme === "dark";
 
-  // Mencegah Hydration Error
   useEffect(() => {
     setMounted(true);
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
+    return () => unsubscribeAuth();
   }, []);
 
-  // Memuat data keranjang dari LocalStorage
   useEffect(() => {
     const loadCart = () => {
       const stored = localStorage.getItem("cart");
@@ -45,7 +55,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
     return () => window.removeEventListener("cartUpdated", loadCart);
   }, []);
 
-  const handleRemoveItem = (id: number) => {
+  const handleRemoveItem = (id: string | number) => {
     const updated = cartItems.filter((item) => item.id !== id);
     setCartItems(updated);
     localStorage.setItem("cart", JSON.stringify(updated));
@@ -67,26 +77,39 @@ export default function Header({ showCartNotification }: HeaderProps) {
     return new Intl.NumberFormat("id-ID").format(amount);
   };
 
-  // ✅ REDIRECT KE HALAMAN CHECKOUT (Sesuai Permintaan Klien)
   const handleCheckoutRedirect = () => {
     setIsCartOpen(false);
-    router.push("/checkout");
+    if (currentUser) {
+      router.push("/checkout");
+    } else {
+      router.push("/register");
+    }
+  };
+
+  // Fungsi Logout
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setIsProfileOpen(false);
+      setIsMenuOpen(false);
+      router.push("/login");
+    } catch (error) {
+      console.error("Gagal melakukan logout:", error);
+    }
   };
 
   return (
     <header className="fixed w-full top-0 z-50 transition-all duration-300 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-gray-200 dark:border-cyan-500/50">
       <div className="container mx-auto px-6 max-w-7xl h-20 flex items-center justify-between">
-        {/* Logo */}
         <Link
           href="/"
           className="text-2xl font-black tracking-widest text-blue-600 dark:text-cyan-300 font-orbitron"
         >
-          E-VOSTE
+          EVOSTE
         </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-700 dark:text-gray-300">
-          {["Shop", "About", "History", "Philosophy"].map((item) => (
+          {["Catalog", "About", "History", "Philosophy"].map((item) => (
             <Link
               key={item}
               href={`#${item.toLowerCase()}`}
@@ -97,9 +120,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
           ))}
         </nav>
 
-        {/* Actions */}
         <div className="flex items-center gap-6 relative">
-          {/* Cart Button */}
           <button
             className="relative p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
             onClick={() => setIsCartOpen(!isCartOpen)}
@@ -125,7 +146,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
             )}
           </button>
 
-          {/* Theme Toggle */}
           <button
             onClick={() => setTheme(isDarkMode ? "light" : "dark")}
             className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
@@ -165,7 +185,71 @@ export default function Header({ showCartNotification }: HeaderProps) {
             )}
           </button>
 
-          {/* Mobile Menu Toggle */}
+          {/* User Profile Dropdown (Desktop) */}
+          <div className="hidden md:block relative">
+            {currentUser ? (
+              <div>
+                <button
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="w-9 h-9 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-full flex items-center justify-center font-bold text-sm uppercase transition-colors focus:ring-2 focus:ring-blue-500"
+                >
+                  {currentUser.email?.charAt(0)}
+                </button>
+
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 mt-3 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden z-50"
+                    >
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                          Masuk sebagai
+                        </p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                          {currentUser.email}
+                        </p>
+                      </div>
+                      <div className="py-2">
+                        <Link
+                          href="/profile"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Profil Saya
+                        </Link>
+                        <Link
+                          href="/orders"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Pesanan Saya
+                        </Link>
+                      </div>
+                      <div className="border-t border-gray-100 dark:border-slate-700 py-1.5">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors font-bold"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm font-semibold text-blue-600 dark:text-cyan-400 hover:underline"
+              >
+                Login
+              </Link>
+            )}
+          </div>
+
           <button
             className="md:hidden p-2 dark:text-white"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -198,7 +282,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
             className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-800 overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4 text-center font-medium dark:text-gray-300">
-              {["Shop", "About", "History", "Philosophy"].map((item) => (
+              {["Catalog", "About", "History", "Philosophy"].map((item) => (
                 <Link
                   key={item}
                   href={`#${item.toLowerCase()}`}
@@ -208,6 +292,46 @@ export default function Header({ showCartNotification }: HeaderProps) {
                   {item}
                 </Link>
               ))}
+
+              {/* Mobile Auth Menu */}
+              {currentUser ? (
+                <div className="flex flex-col gap-4 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
+                  <p className="text-xs text-gray-500">
+                    Masuk sebagai{" "}
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {currentUser.email}
+                    </span>
+                  </p>
+                  <Link
+                    href="/profile"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="font-semibold hover:text-blue-600"
+                  >
+                    Profil Saya
+                  </Link>
+                  <Link
+                    href="/orders"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="font-semibold hover:text-blue-600"
+                  >
+                    Pesanan Saya
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="font-bold text-rose-500 hover:text-rose-600"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-blue-600 dark:text-cyan-400 font-bold border-t border-gray-200 dark:border-gray-700 pt-5 mt-2"
+                >
+                  Login / Register
+                </Link>
+              )}
             </div>
           </motion.nav>
         )}
@@ -258,12 +382,14 @@ export default function Header({ showCartNotification }: HeaderProps) {
                     key={item.id}
                     className="flex gap-4 items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-700"
                   >
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                      <Image
-                        src={item.image}
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800">
+                      <img
+                        src={item.image || "/logo.jpeg"}
                         alt={item.name}
-                        fill
-                        className="object-contain p-1"
+                        className="object-contain w-full h-full absolute inset-0 p-1"
+                        onError={(e) => {
+                          e.currentTarget.src = "/logo.jpeg";
+                        }}
                       />
                     </div>
                     <div className="flex-1">
@@ -305,6 +431,11 @@ export default function Header({ showCartNotification }: HeaderProps) {
                 >
                   Checkout
                 </button>
+                {!currentUser && (
+                  <p className="text-xs text-center text-rose-500 mt-3 font-medium">
+                    Anda harus login untuk melanjutkan checkout.
+                  </p>
+                )}
               </div>
             )}
           </motion.div>

@@ -28,8 +28,7 @@ export default function Footer() {
           </a>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-500">
-          &copy; {new Date().getFullYear()} EVOSTE - Matrix Sync. All Rights
-          Reserved.
+          &copy; {new Date().getFullYear()} EVOSTE - ANDI ALFIAN.
         </p>
       </div>
     </footer>

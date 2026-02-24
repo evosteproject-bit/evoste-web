@@ -1,209 +1,279 @@
 "use client";
 
-import { useState, MouseEvent } from "react";
-import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
-import { products, Product } from "@/lib/data";
-import SectionContainer from "@/components/layout/SectionContainer";
-import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/services/firebaseConfig";
 
-// 1. Tambahkan Interface baru untuk CartItem yang mendukung kuantitas
-export interface CartItem extends Product {
-  quantity: number;
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  description: string;
+  image: string;
 }
 
 export default function ShopSection() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupProduct, setPopupProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // State baru untuk menampilkan detail di Popup
-  const [popupQuantity, setPopupQuantity] = useState(0);
-  const [popupSubtotal, setPopupSubtotal] = useState("");
+  // Referensi untuk mengontrol pergeseran korsel
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  const currentProduct = products[currentIndex];
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  const handleBuyClick = async (e: MouseEvent<HTMLButtonElement>) => {
-    window.dispatchEvent(new Event("cartPing"));
+  const fetchProducts = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "products"));
+      const data: Product[] = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() } as Product);
+      });
+      data.sort((a, b) => a.name.localeCompare(b.name));
+      setProducts(data);
+    } catch (error) {
+      console.error("Gagal memuat katalog produk:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const cartIcon = document.querySelector(".cart-icon");
-    if (cartIcon) {
-      const img = document.createElement("img");
-      img.src = currentProduct.image;
-      img.className =
-        "fixed w-24 h-24 object-cover rounded-full z-[999] transition-all duration-700 ease-in-out pointer-events-none";
-      img.style.left = `${e.clientX - 48}px`;
-      img.style.top = `${e.clientY - 48}px`;
-      document.body.appendChild(img);
-      setTimeout(() => {
-        const rect = cartIcon.getBoundingClientRect();
-        img.style.left = `${rect.left + rect.width / 2 - 20}px`;
-        img.style.top = `${rect.top + rect.height / 2 - 20}px`;
-        img.style.opacity = "0";
-        img.style.transform = "scale(0.2)";
-      }, 100);
-      setTimeout(() => img.remove(), 800);
+  const handleAddToCart = (product: Product) => {
+    if (product.stock <= 0) {
+      alert("Maaf, stok produk ini sedang habis.");
+      return;
     }
 
-    // 2. Logika Penambahan Quantity
-    const currentCart: CartItem[] = JSON.parse(
-      localStorage.getItem("cart") || "[]",
-    );
+    const stored = localStorage.getItem("cart");
+    let cart = stored ? JSON.parse(stored) : [];
 
-    // Cari apakah produk sudah ada di keranjang
-    const existingItemIndex = currentCart.findIndex(
-      (item) => item.id === currentProduct.id,
-    );
-    let newQuantity = 1;
+    const existingIndex = cart.findIndex((item: any) => item.id === product.id);
 
-    if (existingItemIndex >= 0) {
-      // Jika ada, tambahkan quantity
-      currentCart[existingItemIndex].quantity += 1;
-      newQuantity = currentCart[existingItemIndex].quantity;
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity || 1;
+      if (currentQty >= product.stock) {
+        alert(
+          `Anda tidak dapat menambahkan lebih dari ${product.stock} unit untuk produk ini.`,
+        );
+        return;
+      }
+      cart[existingIndex].quantity = currentQty + 1;
     } else {
-      // Jika belum ada, masukkan dengan quantity 1
-      currentCart.push({ ...currentProduct, quantity: 1 });
+      cart.push({ ...product, quantity: 1 });
     }
 
-    localStorage.setItem("cart", JSON.stringify(currentCart));
+    localStorage.setItem("cart", JSON.stringify(cart));
     window.dispatchEvent(new Event("cartUpdated"));
+    alert(`${product.name} berhasil ditambahkan ke keranjang!`);
+  };
 
-    // 3. Kalkulasi harga untuk ditampilkan di Popup
-    const numericPrice = Number(currentProduct.price.replace(/\./g, ""));
-    const totalItemPrice = numericPrice * newQuantity;
+  const formatIDR = (amount: number) => {
+    return new Intl.NumberFormat("id-ID").format(amount);
+  };
 
-    setPopupQuantity(newQuantity);
-    setPopupSubtotal(new Intl.NumberFormat("id-ID").format(totalItemPrice));
-
-    setPopupProduct(currentProduct);
-    setShowPopup(true);
-
-    // CATATAN: Kode addDoc ke koleksi "orders" DIHAPUS dari sini.
-    // Pembuatan order hanya boleh dilakukan di saat proses Checkout (di Header/Cart),
-    // bukan saat sekadar menambahkan produk ke keranjang.
+  // Fungsi navigasi manual untuk desktop
+  const scroll = (direction: "left" | "right") => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === "left" ? -340 : 340; // Perkiraan lebar kartu + celah
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
   };
 
   return (
-    <SectionContainer id="shop" title="Find Your Essence">
-      <p className="max-w-4xl mx-auto text-center text-lg mb-12 text-gray-700 dark:text-gray-300">
-        Fragrance is more than a scent; it is a story, a memory, and a
-        signature. Each creation is made to define you.
-      </p>
-      <div className="relative flex items-center justify-center">
-        <motion.button
-          onClick={() =>
-            setCurrentIndex(
-              (prev) => (prev - 1 + products.length) % products.length,
-            )
-          }
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className="absolute left-0 md:-left-16 p-3 z-30 rounded-full bg-blue-600 dark:bg-cyan-500 text-white shadow-xl"
-        >
-          <ChevronLeftIcon className="w-6 h-6" />
-        </motion.button>
-        <div className="relative w-full max-w-5xl p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentProduct.id}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              className="grid md:grid-cols-2 gap-10 items-center"
-            >
-              <div className="relative h-80 md:h-96 rounded-2xl overflow-hidden border border-gray-300/30 dark:border-gray-600/40 shadow-[0_4px_20px_rgba(0,0,0,0.08)] backdrop-blur-sm transition-all duration-500 hover:shadow-[0_8px_40px_rgba(0,0,0,0.15)] ">
-                <Image
-                  src={currentProduct.image}
-                  alt={currentProduct.name}
-                  fill
-                  className="object-cover transition-transform duration-500 hover:scale-105"
-                />
-              </div>
-              <div className="text-left space-y-4">
-                <h3 className="text-3xl font-bold dark:text-white">
-                  {currentProduct.name}
-                </h3>
-                <p className="text-md text-gray-600 dark:text-gray-400 leading-relaxed">
-                  {currentProduct.desc}
-                </p>
-                <p className="text-3xl font-black text-blue-500 dark:text-cyan-400">
-                  Rp {currentProduct.price}
-                </p>
-                <motion.button
-                  onClick={handleBuyClick}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full md:w-auto px-10 py-4 bg-blue-600 text-white rounded-full font-bold shadow-lg shadow-blue-500/50 dark:bg-cyan-500 dark:shadow-cyan-500/50 transition-all"
-                >
-                  Buy Now
-                </motion.button>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        <motion.button
-          onClick={() =>
-            setCurrentIndex((prev) => (prev + 1) % products.length)
-          }
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className="absolute right-0 md:-right-16 p-3 z-30 rounded-full bg-blue-600 dark:bg-cyan-500 text-white shadow-xl"
-        >
-          <ChevronRightIcon className="w-6 h-6" />
-        </motion.button>
-      </div>
-      <AnimatePresence>
-        {showPopup && popupProduct && (
-          <motion.div
-            key="cart-product-popup"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+    <section
+      id="catalog"
+      className="py-24 bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 relative overflow-hidden"
+    >
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-12 gap-6">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-5xl font-black text-gray-900 dark:text-white font-orbitron tracking-wide mb-4"
           >
-            <motion.div
-              initial={{ y: 20 }}
-              animate={{ y: 0 }}
-              exit={{ y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center"
+            DISCOVER YOUR{" "}
+            <span className="text-blue-600 dark:text-cyan-400">SIGNATURE</span>
+          </motion.h2>
+          <p className="text-gray-500 dark:text-gray-400">
+            Jelajahi koleksi eksklusif kami. Setiap produk dirancang untuk
+            memberikan identitas karakter yang kuat dan tak terlupakan.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="w-12 h-12 border-4 border-blue-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-3xl border border-gray-200 dark:border-slate-700">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Katalog Kosong
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400">
+              Belum ada produk yang tersedia saat ini.
+            </p>
+          </div>
+        ) : (
+          <div className="relative -mx-6 px-6 md:mx-0 md:px-0">
+            {/* Area Korsel Utama */}
+            <div
+              ref={carouselRef}
+              className="flex overflow-x-auto gap-6 pb-8 snap-x snap-mandatory hide-scrollbar pt-4"
+              style={{
+                scrollbarWidth: "none" /* Firefox */,
+                msOverflowStyle: "none" /* IE 10+ */,
+              }}
             >
-              <h3 className="text-2xl font-bold dark:text-white mb-4">
-                Added to Cart 🛒
-              </h3>
-              <Image
-                src={popupProduct.image}
-                alt={popupProduct.name}
-                width={160}
-                height={160}
-                className="object-cover mx-auto rounded-lg mb-4"
+              {/* Inject CSS untuk menyembunyikan scrollbar di Webkit (Chrome/Safari) */}
+              <style
+                dangerouslySetInnerHTML={{
+                  __html: `
+                .hide-scrollbar::-webkit-scrollbar {
+                  display: none;
+                }
+              `,
+                }}
               />
-              <p className="font-semibold text-lg dark:text-white">
-                {popupProduct.name}
-              </p>
 
-              {/* 4. Tampilkan Quantity dan Total Subtotal Item di Popup */}
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg my-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Total in Cart
-                </p>
-                <p className="text-xl font-bold text-gray-800 dark:text-gray-200">
-                  {popupQuantity}x
-                </p>
-                <p className="text-blue-500 dark:text-cyan-400 text-xl font-bold mt-1">
-                  Rp {popupSubtotal}
-                </p>
-              </div>
+              {products.map((product, index) => {
+                const isOutOfStock = product.stock <= 0;
 
+                return (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ delay: index * 0.05 }}
+                    // Lebar kartu statis untuk menjamin bentuk korsel
+                    className="group min-w-[85vw] sm:min-w-[300px] max-w-[85vw] sm:max-w-[300px] snap-center shrink-0 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 dark:hover:shadow-cyan-500/10 border border-gray-100 dark:border-slate-700 transition-all duration-300 flex flex-col h-full"
+                  >
+                    <div className="relative w-full aspect-square mb-6 bg-gray-50 dark:bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+                      <img
+                        src={product.image || "/logo.jpeg"}
+                        alt={product.name}
+                        className={`object-contain w-full h-full absolute inset-0 p-4 transition-transform duration-500 group-hover:scale-110 ${isOutOfStock ? "opacity-50 grayscale" : ""}`}
+                        onError={(e) => {
+                          e.currentTarget.src = "/logo.jpeg";
+                        }}
+                      />
+                      {isOutOfStock && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                          <span className="bg-rose-500 text-white px-4 py-2 rounded-lg font-black tracking-widest uppercase transform -rotate-12 shadow-lg">
+                            STOK HABIS
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col flex-1">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">
+                          {product.name}
+                        </h3>
+                      </div>
+
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 flex-1">
+                        {product.description}
+                      </p>
+                      {!isOutOfStock && product.stock <= 10 && (
+                        <p className="text-xs text-amber-500 font-medium text-center mb-4">
+                          Tersisa {product.stock} barang
+                        </p>
+                      )}
+                      <div className="flex justify-between items-end mt-auto pt-4 border-t border-gray-100 dark:border-slate-700">
+                        <div>
+                          <p className="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">
+                            Harga
+                          </p>
+                          <p className="text-xl font-black text-blue-600 dark:text-cyan-400">
+                            Rp {formatIDR(product.price)}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          disabled={isOutOfStock}
+                          className={`w-12 h-12 flex items-center justify-center rounded-xl transition-all ${
+                            isOutOfStock
+                              ? "bg-gray-200 dark:bg-slate-700 text-gray-400 cursor-not-allowed"
+                              : "bg-gray-900 dark:bg-cyan-500 text-white hover:bg-blue-600 dark:hover:bg-cyan-400 hover:shadow-lg hover:-translate-y-1"
+                          }`}
+                          title={
+                            isOutOfStock ? "Stok Habis" : "Tambah ke Keranjang"
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={2}
+                            stroke="currentColor"
+                            className="w-5 h-5"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+            {/* Kontrol Navigasi Desktop (Disembunyikan di Mobile) */}
+            <div className="hidden md:flex gap-3 content-center justify-center items-center">
               <button
-                onClick={() => setShowPopup(false)}
-                className="w-full py-3 bg-blue-600 dark:bg-cyan-500 text-white rounded-full font-semibold transition"
+                onClick={() => scroll("left")}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:bg-blue-50 dark:hover:bg-cyan-900/30 transition-colors shadow-sm"
+                aria-label="Geser ke kiri"
               >
-                Continue Shopping
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                  />
+                </svg>
               </button>
-            </motion.div>
-          </motion.div>
+              <button
+                onClick={() => scroll("right")}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:bg-blue-50 dark:hover:bg-cyan-900/30 transition-colors shadow-sm"
+                aria-label="Geser ke kanan"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-    </SectionContainer>
+      </div>
+    </section>
   );
 }
