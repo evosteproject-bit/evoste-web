@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
-import { Product } from "@/lib/data";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { auth } from "@/services/firebaseConfig";
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  description: string;
+  image: string;
+}
 
 export interface CartItem extends Product {
   quantity?: number;
@@ -25,7 +32,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // State Autentikasi dan Profil
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -62,8 +68,35 @@ export default function Header({ showCartNotification }: HeaderProps) {
     window.dispatchEvent(new Event("cartUpdated"));
   };
 
+  const handleUpdateQuantity = (id: string | number, delta: number) => {
+    const updatedCart = cartItems.map((item) => {
+      if (item.id === id) {
+        const currentQty = item.quantity || 1;
+        const newQty = currentQty + delta;
+
+        if (newQty < 1) return item;
+
+        if (newQty > item.stock) {
+          alert(
+            `Maksimal pembelian untuk ${item.name} adalah ${item.stock} unit sesuai sisa stok.`,
+          );
+          return item;
+        }
+
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    });
+
+    setCartItems(updatedCart);
+    localStorage.setItem("cart", JSON.stringify(updatedCart));
+    window.dispatchEvent(new Event("cartUpdated"));
+  };
+
   const getTotal = () => {
     return cartItems.reduce((acc, item) => {
+      // Abaikan kalkulasi untuk item yang stoknya habis
+      if ((item.stock || 0) <= 0) return acc;
       const cleanPrice = Number(String(item.price).replace(/\./g, ""));
       return acc + cleanPrice * (item.quantity || 1);
     }, 0);
@@ -82,11 +115,10 @@ export default function Header({ showCartNotification }: HeaderProps) {
     if (currentUser) {
       router.push("/checkout");
     } else {
-      router.push("/register");
+      router.push("/login");
     }
   };
 
-  // Fungsi Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -98,6 +130,9 @@ export default function Header({ showCartNotification }: HeaderProps) {
     }
   };
 
+  // Evaluasi ada tidaknya item yang stoknya habis di keranjang
+  const hasOutOfStockItems = cartItems.some((item) => (item.stock || 0) <= 0);
+
   return (
     <header className="fixed w-full top-0 z-50 transition-all duration-300 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-gray-200 dark:border-cyan-500/50">
       <div className="container mx-auto px-6 max-w-7xl h-20 flex items-center justify-between">
@@ -108,6 +143,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
           EVOSTE
         </Link>
 
+        {/* Desktop Navigasi dengan Rute Absolut */}
         <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-700 dark:text-gray-300">
           {["Catalog", "About", "History", "Philosophy"].map((item) => (
             <Link
@@ -185,7 +221,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
             )}
           </button>
 
-          {/* User Profile Dropdown (Desktop) */}
           <div className="hidden md:block relative">
             {currentUser ? (
               <div>
@@ -272,7 +307,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
         </div>
       </div>
 
-      {/* Mobile Nav */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.nav
@@ -282,6 +316,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
             className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-800 overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4 text-center font-medium dark:text-gray-300">
+              {/* Mobile Navigasi dengan Rute Absolut */}
               {["Catalog", "About", "History", "Philosophy"].map((item) => (
                 <Link
                   key={item}
@@ -293,7 +328,6 @@ export default function Header({ showCartNotification }: HeaderProps) {
                 </Link>
               ))}
 
-              {/* Mobile Auth Menu */}
               {currentUser ? (
                 <div className="flex flex-col gap-4 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
                   <p className="text-xs text-gray-500">
@@ -337,18 +371,17 @@ export default function Header({ showCartNotification }: HeaderProps) {
         )}
       </AnimatePresence>
 
-      {/* Cart Modal */}
       <AnimatePresence>
         {isCartOpen && (
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute top-20 right-6 w-80 md:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 overflow-hidden z-50"
+            className="absolute top-20 right-6 w-[340px] md:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 overflow-hidden z-50"
           >
             <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
               <h3 className="font-bold text-gray-900 dark:text-white">
-                Your Cart
+                Keranjang Belanja
               </h3>
               <button
                 onClick={() => setIsCartOpen(false)}
@@ -374,44 +407,98 @@ export default function Header({ showCartNotification }: HeaderProps) {
             <div className="max-h-80 overflow-y-auto p-5 space-y-4">
               {cartItems.length === 0 ? (
                 <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                  Your cart is empty.
+                  Keranjang Anda masih kosong.
                 </p>
               ) : (
-                cartItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-4 items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-700"
-                  >
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800">
-                      <img
-                        src={item.image || "/logo.jpeg"}
-                        alt={item.name}
-                        className="object-contain w-full h-full absolute inset-0 p-1"
-                        onError={(e) => {
-                          e.currentTarget.src = "/logo.jpeg";
-                        }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {item.quantity || 1}x {item.name}
-                      </h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Rp{" "}
-                        {formatIDR(
-                          Number(String(item.price).replace(/\./g, "")) *
-                            (item.quantity || 1),
-                        )}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveItem(item.id)}
-                      className="text-xs font-semibold text-red-500 hover:text-red-700"
+                cartItems.map((item) => {
+                  const currentQty = item.quantity || 1;
+                  const maxStock = item.stock || 0;
+                  const isOutOfStock = maxStock <= 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex gap-4 items-start p-3 rounded-xl border ${
+                        isOutOfStock
+                          ? "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/50"
+                          : "bg-gray-50 dark:bg-slate-700/50 border-gray-100 dark:border-slate-700"
+                      }`}
                     >
-                      Remove
-                    </button>
-                  </div>
-                ))
+                      <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-600">
+                        {/* Img murni untuk bypass error URL Next.js */}
+                        <img
+                          src={item.image || "/logo.jpeg"}
+                          alt={item.name}
+                          className={`object-contain w-full h-full absolute inset-0 p-1 transition-all ${isOutOfStock ? "grayscale opacity-40" : ""}`}
+                          onError={(e) => {
+                            e.currentTarget.src = "/logo.jpeg";
+                          }}
+                        />
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]">
+                            <span className="text-[9px] font-black text-white bg-rose-600 px-1.5 py-0.5 rounded uppercase tracking-widest transform -rotate-12 shadow-sm">
+                              Habis
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1">
+                        <h4
+                          className={`font-semibold text-sm line-clamp-1 ${isOutOfStock ? "text-gray-400 dark:text-gray-500 line-through" : "text-gray-900 dark:text-white"}`}
+                        >
+                          {item.name}
+                        </h4>
+                        <p
+                          className={`text-sm font-bold mt-1 ${isOutOfStock ? "text-gray-400 dark:text-gray-500" : "text-blue-600 dark:text-cyan-400"}`}
+                        >
+                          Rp{" "}
+                          {formatIDR(
+                            Number(String(item.price).replace(/\./g, "")) *
+                              currentQty,
+                          )}
+                        </p>
+
+                        <div className="flex justify-between items-center mt-3">
+                          <div
+                            className={`flex items-center border rounded-lg overflow-hidden h-8 ${isOutOfStock ? "bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700 opacity-40" : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600"}`}
+                          >
+                            <button
+                              onClick={() => handleUpdateQuantity(item.id, -1)}
+                              disabled={currentQty <= 1 || isOutOfStock}
+                              className="w-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors h-full"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 flex items-center justify-center text-xs font-bold text-gray-900 dark:text-white border-x border-gray-300 dark:border-slate-600 h-full">
+                              {currentQty}
+                            </span>
+                            <button
+                              onClick={() => handleUpdateQuantity(item.id, 1)}
+                              disabled={currentQty >= maxStock || isOutOfStock}
+                              className="w-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors h-full"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors ml-2"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+
+                        {isOutOfStock && (
+                          <p className="text-[10px] text-rose-500 font-bold mt-2">
+                            Item ini tidak tersedia. Silakan hapus.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -425,13 +512,23 @@ export default function Header({ showCartNotification }: HeaderProps) {
                     Rp {formatIDR(getTotal())}
                   </span>
                 </div>
+
+                {/* Tombol Checkout dinonaktifkan jika ada produk yang habis */}
                 <button
                   onClick={handleCheckoutRedirect}
-                  className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-cyan-500/30"
+                  disabled={hasOutOfStockItems}
+                  className={`w-full py-3.5 rounded-xl font-bold transition-all shadow-lg ${
+                    hasOutOfStockItems
+                      ? "bg-gray-400 text-gray-200 cursor-not-allowed shadow-none"
+                      : "bg-cyan-500 hover:bg-cyan-600 text-white shadow-cyan-500/30"
+                  }`}
                 >
-                  Checkout
+                  {hasOutOfStockItems
+                    ? "Hapus Item Habis Untuk Lanjut"
+                    : "Lanjut ke Checkout"}
                 </button>
-                {!currentUser && (
+
+                {!currentUser && !hasOutOfStockItems && (
                   <p className="text-xs text-center text-rose-500 mt-3 font-medium">
                     Anda harus login untuk melanjutkan checkout.
                   </p>
