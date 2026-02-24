@@ -27,10 +27,10 @@ export default function AdminDashboardPage() {
       data.sort((a, b) => {
         const dateA = a.createdAt?.toDate
           ? a.createdAt.toDate().getTime()
-          : new Date(a.createdAt).getTime();
+          : new Date(a.createdAt || 0).getTime();
         const dateB = b.createdAt?.toDate
           ? b.createdAt.toDate().getTime()
-          : new Date(b.createdAt).getTime();
+          : new Date(b.createdAt || 0).getTime();
         return dateB - dateA;
       });
       setOrders(data);
@@ -41,36 +41,35 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Kalkulasi Statistik Metrik (Akumulasi Seluruh Waktu)
+  // Kalkulasi Statistik Metrik dengan Perlindungan Ekstrem (Zero-Trust)
   const metrics = useMemo(() => {
     let totalRev = 0;
     let pending = 0;
-    let completed = 0; // Menggambarkan total transaksi lunas
+    let completed = 0;
     let failed = 0;
 
     orders.forEach((order) => {
-      const status = order.status?.toLowerCase();
+      // Pertahanan lapis pertama: Pastikan status adalah string
+      const status = (order?.status || "").toLowerCase();
 
-      // PERBAIKAN LOGIKA: Menghitung semua status pasca-pembayaran
-      if (
-        status === "settlement" ||
-        status === "success" ||
-        status === "shipped" ||
-        status === "completed"
-      ) {
+      if (["settlement", "success", "shipped", "completed"].includes(status)) {
         completed++;
 
-        const orderTotal =
-          order.cart?.reduce((acc: number, item: any) => {
-            const cleanPrice = Number(String(item.price).replace(/\./g, ""));
-            return acc + cleanPrice * (item.quantity || 1);
-          }, 0) || 0;
+        // Pertahanan lapis kedua: Lindungi array keranjang
+        const cartItems = order?.cart || [];
+        const orderTotal = cartItems.reduce((acc: number, item: any) => {
+          const priceStr = item?.price
+            ? String(item.price).replace(/\./g, "")
+            : "0";
+          const cleanPrice = Number(priceStr);
+          const qty = item?.quantity || 1;
+          return acc + cleanPrice * qty;
+        }, 0);
 
         totalRev += orderTotal;
       } else if (status === "pending") {
         pending++;
       } else {
-        // Mencakup cancel, deny, expire, failed
         failed++;
       }
     });
@@ -82,20 +81,26 @@ export default function AdminDashboardPage() {
   const todayOrders = useMemo(() => {
     const today = new Date();
     return orders.filter((order) => {
-      if (!order.createdAt) return false;
-      const orderDate = order.createdAt?.toDate
-        ? order.createdAt.toDate()
-        : new Date(order.createdAt);
+      if (!order?.createdAt) return false;
 
-      return (
-        orderDate.getDate() === today.getDate() &&
-        orderDate.getMonth() === today.getMonth() &&
-        orderDate.getFullYear() === today.getFullYear()
-      );
+      try {
+        const orderDate = order.createdAt.toDate
+          ? order.createdAt.toDate()
+          : new Date(order.createdAt);
+        // Validasi jika tanggal korup (NaN)
+        if (isNaN(orderDate.getTime())) return false;
+
+        return (
+          orderDate.getDate() === today.getDate() &&
+          orderDate.getMonth() === today.getMonth() &&
+          orderDate.getFullYear() === today.getFullYear()
+        );
+      } catch (error) {
+        return false; // Abaikan dokumen jika format waktu hancur
+      }
     });
   }, [orders]);
 
-  // Logika Paginasi untuk Tabel Hari Ini
   const totalPages = Math.ceil(todayOrders.length / itemsPerPage);
   const paginatedOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -114,7 +119,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Kartu Pendapatan */}
       <div className="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-2xl p-6 md:p-8 shadow-lg border border-cyan-500/30">
         <p className="text-cyan-100 font-semibold mb-2">
           Total Pendapatan Bersih (Lunas)
@@ -124,7 +128,6 @@ export default function AdminDashboardPage() {
         </h2>
       </div>
 
-      {/* Grid Kartu Metrik Kecil */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm flex flex-col">
           <span className="text-gray-400 text-sm font-medium mb-1">
@@ -160,7 +163,6 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Bagian Tabel Transaksi Harian */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-white">Transaksi Hari Ini</h3>
@@ -172,7 +174,6 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
 
-        {/* Tabel */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-400">
@@ -212,43 +213,50 @@ export default function AdminDashboardPage() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
-                    >
-                      <td className="px-6 py-4 font-mono text-cyan-400">
-                        {order.orderId}
-                      </td>
-                      <td className="px-6 py-4">
-                        {order.customerDetails?.name || "-"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                            [
-                              "settlement",
-                              "shipped",
-                              "completed",
-                              "success",
-                            ].includes(order.status)
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : order.status === "pending"
-                                ? "bg-amber-500/20 text-amber-400"
-                                : "bg-rose-500/20 text-rose-400"
-                          }`}
-                        >
-                          {order.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  paginatedOrders.map((order) => {
+                    // Pertahanan lapis ketiga: Pastikan akses nama pelanggan tidak pernah memicu fatal error
+                    const customerName =
+                      order?.customerDetails?.name || "Anonim";
+                    const orderIdDisplay = order?.orderId || order?.id || "N/A";
+                    const orderStatus = (
+                      order?.status || "unknown"
+                    ).toLowerCase();
+
+                    return (
+                      <tr
+                        key={order?.id || Math.random().toString()}
+                        className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors"
+                      >
+                        <td className="px-6 py-4 font-mono text-cyan-400">
+                          {orderIdDisplay}
+                        </td>
+                        <td className="px-6 py-4">{customerName}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                              [
+                                "settlement",
+                                "shipped",
+                                "completed",
+                                "success",
+                              ].includes(orderStatus)
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : orderStatus === "pending"
+                                  ? "bg-amber-500/20 text-amber-400"
+                                  : "bg-rose-500/20 text-rose-400"
+                            }`}
+                          >
+                            {orderStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Paginasi Dasbor */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-3 bg-gray-900/50 border-t border-gray-700">
               <span className="text-xs text-gray-500">
