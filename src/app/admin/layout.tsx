@@ -75,9 +75,9 @@ export default function AdminLayout({
       <div className="min-h-screen bg-gray-900 text-white flex">
         {/* Bilah Sisi (Sidebar) */}
         <aside className="w-64 bg-gray-800 border-r border-gray-700 hidden md:flex flex-col">
-          <div className="h-20 flex items-center px-6 border-b border-gray-700">
+          <div className="h-20 flex items-center px-9 border-b border-gray-700">
             <h1 className="text-xl font-black tracking-widest text-cyan-400 font-orbitron">
-              E-VOSTE ADMIN
+              EVOSTE
             </h1>
           </div>
           <nav className="flex-1 py-6 px-4 space-y-2">
@@ -112,14 +112,11 @@ export default function AdminLayout({
         <main className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
           {/* Header Mobile & Top Bar */}
           <header className="bg-gray-900 border-b border-slate-200 sticky top-0 z-30 shadow-lg">
-            <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+            <div className="mx-auto px-10 h-20 flex justify-between items-center">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-xl tracking-tighter">
-                  EV
-                </div>
                 <div>
                   <h1 className="text-xl font-bold tracking-tight text-white">
-                    EVOSTE Portal
+                    ADMIN PANEL
                   </h1>
                   <p className="text-sm text-slate-500 font-medium">
                     {/* Menggunakan state adminEmail untuk merender email */}
