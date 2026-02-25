@@ -303,7 +303,7 @@ export default function QuizSection() {
                   transition={{ delay: 0.6 }}
                 >
                   <a
-                    href="#shop"
+                    href="#catalog"
                     className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-bold hover:shadow-lg hover:scale-105 transition transform"
                   >
                     Shop Now

@@ -28,7 +28,7 @@ export default function HeroSection() {
           Be Timeless Crafted Your Scent Legacy
         </motion.p>
         <motion.a
-          href="#shop"
+          href="#catalog"
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ type: "spring", stiffness: 150, delay: 0.4 }}
