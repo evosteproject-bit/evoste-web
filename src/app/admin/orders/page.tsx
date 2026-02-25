@@ -274,7 +274,9 @@ export default function AdminOrdersPage() {
                 <th className="px-6 py-4 text-center">Pelanggan</th>
                 <th className="px-6 py-4 text-center">Tanggal</th>
                 <th className="px-6 py-4 text-center">Status Pengiriman</th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                {activeTab !== "All" && (
+                  <th className="px-6 py-4 text-center">Aksi</th>
+                )}
               </tr>
             </thead>
             <tbody className="text-center">
@@ -308,26 +310,28 @@ export default function AdminOrdersPage() {
                       <td className="px-6 py-4">
                         {renderStatusBadge(order.status)}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => openDetailModal(order)}
-                            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-xs font-bold transition-colors border border-gray-600 shadow-sm"
-                          >
-                            Detail
-                          </button>
-
-                          {nextStatusInfo && (
+                      {activeTab !== "All" && (
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => handleAdvanceStatus(order)}
-                              disabled={isProcessing}
-                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                              onClick={() => openDetailModal(order)}
+                              className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-xs font-bold transition-colors border border-gray-600 shadow-sm"
                             >
-                              {nextStatusInfo.actionLabel}
+                              Detail
                             </button>
-                          )}
-                        </div>
-                      </td>
+
+                            {nextStatusInfo && (
+                              <button
+                                onClick={() => handleAdvanceStatus(order)}
+                                disabled={isProcessing}
+                                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                              >
+                                {nextStatusInfo.actionLabel}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
