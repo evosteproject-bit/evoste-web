@@ -78,6 +78,13 @@ export async function POST(req: Request) {
     });
 
     // Permintaan Token Midtrans Snap
+    // Tentukan base URL untuk return URL setelah pembayaran
+    const baseUrl =
+      req.headers.get("origin") ||
+      req.headers.get("referer")?.replace(/\/$/, "") ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      "http://localhost:3000";
+
     const parameters = {
       transaction_details: {
         order_id: safeOrderId,
@@ -87,6 +94,12 @@ export async function POST(req: Request) {
         first_name: customerDetails.name,
         email: customerDetails.email,
         phone: customerDetails.phone,
+      },
+      // URL kembali setelah pembayaran (untuk flow redirect)
+      callbacks: {
+        finish: `${baseUrl}/checkout/success`,
+        unfinish: `${baseUrl}/checkout/pending`,
+        error: `${baseUrl}/checkout/failed`,
       },
     };
 

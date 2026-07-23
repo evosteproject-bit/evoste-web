@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/services/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebaseConfig";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,9 +27,23 @@ export default function LoginPage() {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      // Asumsi: jika login berhasil, arahkan ke halaman utama atau checkout
-      router.push("/");
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password,
+      );
+
+      // Cek role user di Firestore untuk menentukan redirect
+      const userDocRef = doc(db, "users", userCredential.user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists() && userDocSnap.data().role === "admin") {
+        // Admin → ke dashboard
+        router.push("/admin/dashboard");
+      } else {
+        // Customer → ke beranda
+        router.push("/");
+      }
     } catch (err: any) {
       setError("Email atau password tidak valid.");
     } finally {
@@ -100,6 +115,31 @@ export default function LoginPage() {
             Daftar sekarang
           </Link>
         </p>
+
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
+          <Link
+            href="/admin/login"
+            className="group flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+              />
+            </svg>
+            Masuk sebagai Administrator
+            <span className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+              →
+            </span>
+          </Link>
+        </div>
       </div>
     </div>
   );

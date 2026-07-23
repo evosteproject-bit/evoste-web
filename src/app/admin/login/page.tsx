@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/services/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebaseConfig";
 import { motion } from "framer-motion";
 
 export default function AdminLogin() {
@@ -20,7 +22,22 @@ export default function AdminLogin() {
 
     try {
       // Eksekusi otentikasi langsung ke server Firebase
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+
+      // Verifikasi role admin sebelum izinkan masuk
+      const userDocRef = doc(db, "users", userCredential.user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists() || userDocSnap.data().role !== "admin") {
+        // User terautentikasi tapi bukan admin → tolak
+        setError("Akses ditolak. Akun Anda tidak memiliki hak administrator.");
+        return;
+      }
+
       router.push("/admin/dashboard");
     } catch (err: any) {
       // Penanganan eror umum untuk mencegah kebocoran informasi sistem
@@ -122,6 +139,15 @@ export default function AdminLogin() {
               </button>
             </div>
           </form>
+
+          <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+            <Link
+              href="/login"
+              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              ← Kembali ke Login Pelanggan
+            </Link>
+          </div>
         </motion.div>
       </div>
     </div>

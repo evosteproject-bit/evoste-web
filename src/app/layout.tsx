@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import ChatbotWidget from "@/components/chat/ChatbotWidget";
 import Script from "next/script"; // Pastikan ini di-import di atas
 import "./globals.css";
 
@@ -52,6 +53,7 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
+          <ChatbotWidget />
         </ThemeProvider>
         <Script
           src="https://app.sandbox.midtrans.com/snap/snap.js"

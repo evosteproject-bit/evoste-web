@@ -61,22 +61,10 @@ export default function CheckoutPage() {
       router.push("/");
     }
 
-    // 3. Injeksi Script Midtrans Snap
-    const isProduction = process.env.NEXT_PUBLIC_MIDTRANS_USE_PROD === "1";
-    const scriptUrl = isProduction
-      ? "https://app.midtrans.com/snap/snap.js"
-      : "https://app.sandbox.midtrans.com/snap/snap.js";
-
-    const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
-
-    const existingScript = document.getElementById("midtrans-snap");
-    if (!existingScript) {
-      const scriptTag = document.createElement("script");
-      scriptTag.src = scriptUrl;
-      scriptTag.id = "midtrans-snap";
-      scriptTag.setAttribute("data-client-key", clientKey);
-      document.body.appendChild(scriptTag);
-    }
+    // Catatan: snap.js sudah di-load global di layout.tsx via <Script strategy="beforeInteractive">,
+    // sehingga tidak perlu injeksi ulang di sini. Default flow adalah redirect_url
+    // (lihat handleSubmit) yang TIDAK memerlukan snap.js — fallback snap.pay() tetap
+    // bisa dipakai jika redirect_url tidak tersedia di response Midtrans.
 
     return () => {
       unsubscribeAuth();
@@ -129,8 +117,18 @@ export default function CheckoutPage() {
         localStorage.setItem("latest_snap_token", data.token);
       }
 
-      const snap = (window as any).snap;
+      // Prioritaskan redirect_url (menghindari CSP error dari popup Midtrans)
+      // Popup Midtrans (snap.pay) memiliki CSP ketat yang memblokir inline script-nya sendiri
+      // di environment tertentu. Redirect flow lebih stabil.
+      if (data.redirect_url) {
+        // Simpan cart reference agar bisa di-clear di halaman success
+        localStorage.setItem("pending_order_redirect", "1");
+        window.location.href = data.redirect_url;
+        return;
+      }
 
+      // Fallback ke snap.pay popup jika redirect_url tidak tersedia
+      const snap = (window as any).snap;
       if (snap && data.token) {
         snap.pay(data.token, {
           onSuccess: function () {
@@ -147,8 +145,6 @@ export default function CheckoutPage() {
             setLoading(false);
           },
         });
-      } else if (data.redirect_url) {
-        window.location.href = data.redirect_url;
       } else {
         throw new Error("Sistem pembayaran tidak merespons. Coba lagi nanti.");
       }

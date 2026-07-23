@@ -30,6 +30,7 @@ function SuccessContent() {
     if (status === "settlement" || status === "capture") {
       localStorage.removeItem("cart");
       localStorage.removeItem("latest_snap_token");
+      localStorage.removeItem("pending_order_redirect");
       window.dispatchEvent(new Event("cartUpdated"));
     }
   }, [status, token, router]);

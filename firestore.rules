@@ -2,19 +2,41 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ✅ Admins collection - hanya authenticated users yang bisa akses
-    match /admins/{uid} {
-      allow read, write: if request.auth.uid == uid;
-      allow read: if request.auth.uid != null;
+
+    // Helper: cek apakah user adalah admin
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // ✅ Orders collection - public untuk sekarang (bisa di-restrict nanti)
-    match /orders/{document=**} {
-      allow read, write: if true;
+    // ✅ Products: publik baca katalog, customer boleh decrement stok saat checkout,
+    // admin full control
+    match /products/{productId} {
+      allow read: if true;
+
+      // Customer checkout: hanya boleh update field 'stock', dan hanya boleh turun
+      allow update: if request.auth != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
+        request.resource.data.stock <= resource.data.stock;
+
+      // Create/delete tetap admin
+      allow create, delete: if isAdmin();
     }
 
-    // ✅ Default - deny semua
+    // ✅ Users: user kelola profil sendiri, admin bisa baca semua
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAdmin();
+    }
+
+    // ✅ Orders: customer buat order sendiri & baca order miliknya,
+    // admin punya kontrol penuh
+    match /orders/{orderId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null &&
+        resource.data.customerDetails.email == request.auth.token.email;
+      allow read, write, update, delete: if isAdmin();
+    }
+
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }

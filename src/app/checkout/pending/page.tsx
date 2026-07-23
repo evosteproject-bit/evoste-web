@@ -21,25 +21,8 @@ function PendingContent() {
 
     setToken(urlToken || storedToken);
 
-    const isProduction =
-      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.startsWith("Mid-client");
-    const scriptUrl = isProduction
-      ? "https://app.sandbox.midtrans.com/snap/snap.js"
-      : "https://app.midtrans.com/snap/snap.js";
-
-    const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
-
-    const scriptTag = document.createElement("script");
-    scriptTag.src = scriptUrl;
-    scriptTag.setAttribute("data-client-key", clientKey);
-    document.body.appendChild(scriptTag);
-
-    return () => {
-      const existingScript = document.body.querySelector(
-        `script[src="${scriptUrl}"]`,
-      );
-      if (existingScript) document.body.removeChild(existingScript);
-    };
+    // Catatan: snap.js sudah di-load global di layout.tsx (strategy="beforeInteractive"),
+    // tidak perlu injeksi manual di sini.
   }, [searchParams]);
 
   const handleResumePayment = () => {
