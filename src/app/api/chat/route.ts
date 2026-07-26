@@ -31,7 +31,7 @@ Gaya komunikasi:
 - Gunakan markdown formatting secukupnya.`;
 
 interface ChatMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
 }
 
@@ -171,15 +171,23 @@ async function executeToolCall(
 }
 
 export async function POST(req: Request) {
-  // Fail-fast jika API key tidak ada
+  // Fail-fast jika API key Ollama tidak ada
   if (!OLLAMA_API_KEY) {
-    console.error("[Ollama API] OLLAMA_API_KEY tidak dikonfigurasi");
     return NextResponse.json(
-      {
-        error:
-          "Layanan chatbot belum dikonfigurasi. Hubungi administrator.",
-      },
+      { error: "Layanan chatbot belum dikonfigurasi." },
       { status: 500 },
+    );
+  }
+
+  // Auth customer
+  let customer: { uid: string; email: string };
+  try {
+    const { getCustomerFromRequest } = await import("@/services/auth");
+    customer = await getCustomerFromRequest(req);
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "Silakan login untuk menggunakan chatbot." },
+      { status: 401 },
     );
   }
 
@@ -194,18 +202,12 @@ export async function POST(req: Request) {
   }
 
   const { messages } = body;
-
   if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json(
-      { error: "Pesan tidak boleh kosong." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Pesan tidak boleh kosong." }, { status: 400 });
   }
 
-  // Batasi history percakapan agar tidak membengkak
+  // Sanitasi (existing logic)
   const recentMessages = messages.slice(-20);
-
-  // Sanitasi pesan: hanya izinkan role user/assistant dan content string
   const sanitized: ChatMessage[] = recentMessages
     .filter(
       (m) =>
@@ -215,88 +217,106 @@ export async function POST(req: Request) {
     )
     .map((m) => ({
       role: m.role,
-      content: String(m.content).slice(0, 2000), // batas per pesan
+      content: String(m.content).slice(0, 2000),
     }));
 
   if (sanitized.length === 0) {
-    return NextResponse.json(
-      { error: "Tidak ada pesan valid untuk diproses." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Tidak ada pesan valid." }, { status: 400 });
   }
 
-  try {
-    const upstream = await fetch(OLLAMA_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OLLAMA_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...sanitized],
-        stream: false,
-      }),
-      // Timeout 25 detik (kurang dari default Next.js 30 detik)
-      signal: AbortSignal.timeout(25_000),
-    });
+  // Loop: handle tool calls
+  const MAX_TOOL_ITERATIONS = 5;
+  let conversation: ChatMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...sanitized,
+  ];
 
-    if (!upstream.ok) {
-      const errorBody = await upstream.text().catch(() => "");
-      console.error(
-        `[Ollama API] Upstream error ${upstream.status}:`,
-        errorBody,
-      );
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    try {
+      const upstream = await fetch(OLLAMA_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OLLAMA_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL,
+          messages: conversation,
+          tools: TOOLS,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(25_000),
+      });
 
-      if (upstream.status === 429) {
+      if (!upstream.ok) {
+        const errBody = await upstream.text().catch(() => "");
+        console.error(`[Chat] Ollama error ${upstream.status}:`, errBody);
+        if (upstream.status === 429) {
+          return NextResponse.json(
+            { error: "Terlalu banyak permintaan. Coba lagi sebentar." },
+            { status: 429 },
+          );
+        }
         return NextResponse.json(
-          { error: "Terlalu banyak permintaan. Coba lagi sebentar ya." },
-          { status: 429 },
+          { error: "Maaf, asisten sedang tidak tersedia." },
+          { status: 502 },
         );
       }
 
-      if (upstream.status === 401 || upstream.status === 403) {
+      const data = await upstream.json();
+      const assistantMessage = data?.message;
+
+      if (!assistantMessage) {
         return NextResponse.json(
-          { error: "Autentikasi chatbot tidak valid." },
-          { status: 500 },
+          { error: "Respons asisten tidak valid." },
+          { status: 502 },
         );
       }
 
+      // Check if AI wants to call a tool
+      const toolCalls = assistantMessage.tool_calls;
+      if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+        // Append assistant message to conversation
+        conversation.push({
+          role: "assistant",
+          content: assistantMessage.content || "",
+        });
+
+        // Execute each tool call
+        for (const toolCall of toolCalls) {
+          const result = await executeToolCall(toolCall, customer.email);
+          conversation.push({
+            role: "tool",
+            content: JSON.stringify(result),
+          });
+        }
+
+        // Continue loop — AI will incorporate tool results
+        continue;
+      }
+
+      // No tool call — this is the final answer
+      const reply = assistantMessage.content || "Maaf, saya tidak dapat memberikan jawaban saat ini.";
+      return NextResponse.json({
+        message: { role: "assistant", content: reply },
+      });
+    } catch (err: any) {
+      const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
+      console.error("[Chat] Error:", err);
       return NextResponse.json(
         {
-          error:
-            "Maaf, asisten sedang tidak tersedia. Silakan coba lagi nanti.",
+          error: isTimeout
+            ? "Respons chatbot terlalu lama. Coba lagi."
+            : "Gagal terhubung ke chatbot.",
         },
-        { status: 502 },
+        { status: isTimeout ? 504 : 502 },
       );
     }
-
-    const data = await upstream.json();
-
-    const reply =
-      data?.message?.content ??
-      "Maaf, saya tidak dapat memberikan jawaban saat ini.";
-
-    return NextResponse.json({
-      message: {
-        role: "assistant",
-        content: reply,
-      },
-    });
-  } catch (error: unknown) {
-    const isTimeout =
-      error instanceof Error &&
-      (error.name === "TimeoutError" || error.name === "AbortError");
-
-    console.error("[Ollama API] Request failed:", error);
-
-    return NextResponse.json(
-      {
-        error: isTimeout
-          ? "Respons chatbot terlalu lama. Silakan coba lagi."
-          : "Gagal terhubung ke layanan chatbot. Coba lagi nanti.",
-      },
-      { status: isTimeout ? 504 : 502 },
-    );
   }
+
+  // Loop exhausted
+  return NextResponse.json(
+    { error: "Terlalu banyak iterasi tool. Coba lagi dengan pertanyaan lebih spesifik." },
+    { status: 500 },
+  );
 }
