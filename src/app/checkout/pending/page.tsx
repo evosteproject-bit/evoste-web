@@ -34,7 +34,16 @@ function PendingContent() {
       snap.pay(token, {
         onSuccess: () => {
           localStorage.removeItem("latest_snap_token"); // Bersihkan setelah sukses
-          router.push("/checkout/success");
+          const orderIdQS =
+            searchParams.get("orderId") ??
+            (typeof window !== "undefined"
+              ? localStorage.getItem("latest_order_id")
+              : null);
+          router.push(
+            orderIdQS
+              ? `/checkout/success?orderId=${encodeURIComponent(orderIdQS)}`
+              : "/checkout/success",
+          );
         },
         onPending: () => setLoading(false),
         onError: () => router.push("/checkout/failed"),

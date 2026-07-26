@@ -95,9 +95,10 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
+      const orderId = `EVO-${Date.now()}`;
       const payload = {
         cart: cartItems,
-        orderId: `EVO-${Date.now()}`,
+        orderId,
         customerDetails: formData,
       };
 
@@ -117,6 +118,11 @@ export default function CheckoutPage() {
         localStorage.setItem("latest_snap_token", data.token);
       }
 
+      // Persist orderId so success/pending pages can read it post-popup
+      if (orderId) {
+        localStorage.setItem("latest_order_id", orderId);
+      }
+
       // Prioritaskan redirect_url (menghindari CSP error dari popup Midtrans)
       // Popup Midtrans (snap.pay) memiliki CSP ketat yang memblokir inline script-nya sendiri
       // di environment tertentu. Redirect flow lebih stabil.
@@ -132,11 +138,20 @@ export default function CheckoutPage() {
       if (snap && data.token) {
         snap.pay(data.token, {
           onSuccess: function () {
-            router.push("/checkout/success");
+            const orderIdLS = localStorage.getItem("latest_order_id");
+            router.push(
+              orderIdLS
+                ? `/checkout/success?orderId=${encodeURIComponent(orderIdLS)}`
+                : "/checkout/success",
+            );
           },
           onPending: function () {
             const baseUrl = window.location.origin;
-            router.push(`${baseUrl}/checkout/pending?token=${data.token}`);
+            const orderIdLS = localStorage.getItem("latest_order_id");
+            const qs = orderIdLS
+              ? `?orderId=${encodeURIComponent(orderIdLS)}&token=${data.token}`
+              : `?token=${data.token}`;
+            router.push(`${baseUrl}/checkout/pending${qs}`);
           },
           onError: function () {
             router.push("/checkout/failed");

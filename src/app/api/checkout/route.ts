@@ -96,9 +96,9 @@ export async function POST(req: Request) {
         phone: customerDetails.phone,
       },
       callbacks: {
-        finish: `${baseUrl}/checkout/success`,
-        unfinish: `${baseUrl}/checkout/pending`,
-        error: `${baseUrl}/checkout/failed`,
+        finish: `${baseUrl}/checkout/success?orderId=${safeOrderId}`,
+        unfinish: `${baseUrl}/checkout/pending?orderId=${safeOrderId}`,
+        error: `${baseUrl}/checkout/failed?orderId=${safeOrderId}`,
       },
     };
 

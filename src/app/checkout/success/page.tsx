@@ -16,13 +16,20 @@ function SuccessContent() {
   const [transactionStatus, setTransactionStatus] = useState(status);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      setTransactionStatus(null);
+      return;
+    }
 
-    // Cek status real-time saat landing
+    // Reset sebelum polling agar navigasi antar orderId tidak menampilkan
+    // state stale dari order sebelumnya.
+    setTransactionStatus(null);
+    const controller = new AbortController();
     fetch("/api/check-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId }),
+      signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
@@ -30,30 +37,37 @@ function SuccessContent() {
           setTransactionStatus(data.status);
         }
       })
-      .catch((err) => console.error("Gagal cek status:", err));
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          console.error("Gagal cek status:", err);
+        }
+      });
+    return () => controller.abort();
   }, [orderId]);
 
   useEffect(() => {
-    // 1. Tangkap status dari parameter URL Midtrans
-    if (status === "pending" || status === "authorize") {
-      router.replace(`/checkout/pending${token ? `?token=${token}` : ""}`);
+    // Polled value adalah source of truth. URL-driven redirect (yang lama)
+    // bisa race dengan polling flip state ke "paid" dan bounce user kembali
+    // ke /checkout/pending. Effect ini hanya memicu redirect gagal dari
+    // hasil polling; transisi "pending" (spinner) dan success sudah di-handle
+    // oleh render di bawah.
+    if (transactionStatus === null) return; // masih verifying
+    if (transactionStatus === "pending") {
+      return; // spinner sudah ditampilkan oleh guard di bawah
+    }
+    if (transactionStatus === "failed" || transactionStatus === "cancelled") {
+      const orderIdQS = orderId
+        ? `?orderId=${encodeURIComponent(orderId)}`
+        : "";
+      router.replace(`/checkout/failed${orderIdQS}`);
       return;
     }
-
-    // 2. Tangkap status kegagalan (Denied, Cancel, atau Expired)
-    if (status === "deny" || status === "cancel" || status === "expire") {
-      router.replace("/checkout/failed");
-      return;
-    }
-
-    // 3. Tangkap status sukses (Settlement atau Capture)
-    if (status === "settlement" || status === "capture") {
-      localStorage.removeItem("cart");
-      localStorage.removeItem("latest_snap_token");
-      localStorage.removeItem("pending_order_redirect");
-      window.dispatchEvent(new Event("cartUpdated"));
-    }
-  }, [status, token, router]);
+    // "paid" / "refunded" / unknown → render konten sukses & bersihkan cart
+    localStorage.removeItem("cart");
+    localStorage.removeItem("latest_snap_token");
+    localStorage.removeItem("pending_order_redirect");
+    window.dispatchEvent(new Event("cartUpdated"));
+  }, [transactionStatus, orderId, router]);
 
   // Jika status pending, jangan tampilkan konten sukses (sedang loading redirect)
   if (transactionStatus === "pending") {
