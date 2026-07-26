@@ -75,3 +75,6 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
