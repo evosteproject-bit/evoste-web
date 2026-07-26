@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { auth } from "@/services/firebaseConfig";
 import MarkdownText from "./MarkdownText";
 
 interface Message {
@@ -82,9 +83,26 @@ export default function ChatbotWidget() {
         content: m.content,
       }));
 
+      let token: string | null = null;
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          token = await currentUser.getIdToken();
+        } catch (err) {
+          console.error("Gagal mendapatkan ID token:", err);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ messages: history }),
       });
 
