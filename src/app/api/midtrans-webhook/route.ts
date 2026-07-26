@@ -26,8 +26,16 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 const ORDER_ID_PATTERN = /^EVO-\d+$/;
+const SHA512_HEX_PATTERN = /^[0-9a-f]{128}$/;
 
 function safeEqualHex(a: string, b: string): boolean {
+  // Strict validation: both inputs must be exactly 128 lowercase hex chars
+  // (SHA-512 digest). Buffer.from(hex, 'hex') silently truncates odd-length
+  // strings and ignores non-hex chars, so we must reject malformed inputs
+  // before reaching the byte comparison.
+  if (!SHA512_HEX_PATTERN.test(a) || !SHA512_HEX_PATTERN.test(b)) {
+    return false;
+  }
   const bufA = Buffer.from(a, "hex");
   const bufB = Buffer.from(b, "hex");
   if (bufA.length !== bufB.length) return false;
