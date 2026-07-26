@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminDb } from "@/services/firebaseAdmin";
 
 const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gpt-oss:120b";
@@ -78,6 +79,96 @@ const TOOLS = [
     },
   },
 ];
+
+interface OllamaToolCall {
+  function: {
+    name: string;
+    arguments: string; // JSON string
+  };
+}
+
+async function handleGetOrder(
+  args: { order_id: string },
+  customerEmail: string,
+): Promise<unknown> {
+  const db = getAdminDb();
+  const orderRef = db.collection("orders").doc(args.order_id);
+  const orderSnap = await orderRef.get();
+
+  if (!orderSnap.exists) {
+    return { found: false };
+  }
+
+  const order = orderSnap.data();
+  if (!order || order.customerDetails?.email !== customerEmail) {
+    // Anti-enumeration: same response as not found
+    return { found: false };
+  }
+
+  return {
+    found: true,
+    order: {
+      orderId: order.orderId,
+      status: order.status,
+      statusUpdatedAt: order.statusUpdatedAt || null,
+      items: order.cart?.map((item: any) => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      total: order.grossAmount,
+      shippingAddress: order.customerDetails?.address || null,
+      createdAt: order.createdAt || null,
+    },
+  };
+}
+
+async function handleListProducts(
+  args: { in_stock_only?: boolean },
+): Promise<unknown> {
+  const db = getAdminDb();
+  let query = db.collection("products");
+  const snapshot = await query.get();
+
+  const products = snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      price: data.price,
+      stock: data.stock,
+      description: data.description,
+      image: data.image,
+    };
+  });
+
+  const filtered = args.in_stock_only
+    ? products.filter((p) => (p.stock ?? 0) > 0)
+    : products;
+
+  return { products: filtered };
+}
+
+async function executeToolCall(
+  toolCall: OllamaToolCall,
+  customerEmail: string,
+): Promise<unknown> {
+  let args: any;
+  try {
+    args = JSON.parse(toolCall.function.arguments);
+  } catch {
+    return { error: "Invalid tool arguments" };
+  }
+
+  switch (toolCall.function.name) {
+    case "get_order":
+      return handleGetOrder(args, customerEmail);
+    case "list_products":
+      return handleListProducts(args);
+    default:
+      return { error: `Unknown tool: ${toolCall.function.name}` };
+  }
+}
 
 export async function POST(req: Request) {
   // Fail-fast jika API key tidak ada
