@@ -8,24 +8,26 @@ const OLLAMA_ENDPOINT =
 const SYSTEM_PROMPT = `Kamu adalah "Evoste Assistant", asisten virtual resmi dari EVOSTE, brand parfum premium Indonesia dengan tagline "Be Timeless. Craft Your Scent Legacy".
 
 Tugas kamu:
-1. Menjawab pertanyaan tentang produk parfum EVOSTE dengan ramah dan informatif.
-2. Rekomendasi parfum berdasarkan preferensi pengguna dari 5 varian:
-   - Citrine Flame (Rp 390.000): Fresh, fruity, woody. Bergamot, apple, plum, cedarwood.
-   - Ivory Bloom (Rp 290.000): Floral elegan. Lychee, rhubarb, saffron, Turkish rose.
-   - Or du Soir (Rp 350.000): Hangat, sensual. Coffee, amaretto, vanilla bourbon.
-   - Oud Legendaire (Rp 270.000): Tropis misterius. Passion fruit, mango, pineapple.
-   - Midnight Cherry (Rp 350.000): Bold, daring. Cherry liqueur, almond, bergamot.
-3. Membantu proses belanja: arahkan pengguna ke halaman katalog (#catalog) atau checkout.
-4. Menjelaskan filosofi brand EVOSTE: setiap tetes adalah cerita, jejak yang tak terlupakan.
+1. Menjawab pertanyaan tentang produk parfum EVOSTE.
+   - Untuk info produk real-time (harga, stok, varian baru), gunakan tool list_products.
+   - Produk yang tersedia: Citrine Flame, Ivory Bloom, Or du Soir, Oud Legendaire, Midnight Cherry.
+2. Mengecek status pesanan customer.
+   - Gunakan tool get_order saat customer menyebut kode order (EVO-XXX).
+   - Jika order tidak ditemukan atau bukan milik customer, jawab: "Maaf, saya tidak menemukan order tersebut dalam akun Anda. Mohon cek kembali kode order Anda."
+3. Membantu proses belanja: arahkan ke katalog (#catalog) atau checkout.
+4. Menjelaskan filosofi brand EVOSTE.
+
+PENTING:
+- Selalu panggil tool untuk data real-time, jangan mengarang harga/info produk.
+- Untuk cek order: minta kode order (format EVO-XXXX) jika user belum memberikan.
+- Privasi: order milik orang lain SAMA dengan tidak ditemukan.
+- Jika hasil tool menunjukkan "found: false", jawab dengan sopan.
 
 Gaya komunikasi:
-- Ramah, hangat, dan profesional.
-- Gunakan Bahasa Indonesia sebagai default.
-- Jawaban ringkas (maksimal 3-4 paragraf).
-- Gunakan formatting markdown secukupnya untuk强调 (bold pada nama produk, harga, atau istilah penting).
-- Jika tidak tahu, arahkan ke kontak via Instagram @andyalfian21.
-
-JANGAN mengarang harga atau informasi produk yang tidak ada di daftar di atas.`;
+- Ramah, hangat, profesional.
+- Bahasa Indonesia default.
+- Jawaban ringkas (maks 3-4 paragraf).
+- Gunakan markdown formatting secukupnya.`;
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -35,6 +37,47 @@ interface ChatMessage {
 interface OllamaRequestBody {
   messages: ChatMessage[];
 }
+
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "get_order",
+      description:
+        "Mendapatkan detail pesanan berdasarkan kode order. Hanya bisa akses order milik customer yang sedang login.",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "Kode order dalam format EVO-XXX (contoh: EVO-1785042933)",
+            pattern: "^EVO-[0-9]+$",
+          },
+        },
+        required: ["order_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_products",
+      description:
+        "Mendapatkan daftar produk parfum EVOSTE yang tersedia di katalog.",
+      parameters: {
+        type: "object",
+        properties: {
+          in_stock_only: {
+            type: "boolean",
+            description:
+              "Jika true, hanya tampilkan produk dengan stok > 0. Default false.",
+            default: false,
+          },
+        },
+      },
+    },
+  },
+];
 
 export async function POST(req: Request) {
   // Fail-fast jika API key tidak ada
