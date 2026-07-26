@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -12,6 +12,26 @@ function SuccessContent() {
   // Ambil status transaksi dari URL Midtrans
   const status = searchParams.get("transaction_status");
   const token = searchParams.get("token"); // Ambil token jika ada
+  const orderId = searchParams.get("orderId") ?? searchParams.get("order_id");
+  const [transactionStatus, setTransactionStatus] = useState(status);
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    // Cek status real-time saat landing
+    fetch("/api/check-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status) {
+          setTransactionStatus(data.status);
+        }
+      })
+      .catch((err) => console.error("Gagal cek status:", err));
+  }, [orderId]);
 
   useEffect(() => {
     // 1. Tangkap status dari parameter URL Midtrans
@@ -36,7 +56,7 @@ function SuccessContent() {
   }, [status, token, router]);
 
   // Jika status pending, jangan tampilkan konten sukses (sedang loading redirect)
-  if (status === "pending") {
+  if (transactionStatus === "pending") {
     return (
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
