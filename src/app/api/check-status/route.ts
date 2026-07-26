@@ -16,8 +16,44 @@ const STATUS_MAP: Record<string, string> = {
   partial_refund: "refunded",
 };
 
+// Validasi orderId pola EVO-<digits> — sama dengan webhook untuk konsistensi.
+const ORDER_ID_PATTERN = /^EVO-\d+$/;
+
+// Per-IP rate limit (best-effort in-memory).
+// CATATAN: ini per-instance; pada Vercel serverless setiap cold start dapat
+// map baru, jadi limit efektif kira-kira N_instances * 10/min. Untuk
+// production-grade limiting butuh Upstash/Redis.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 10;
+const rateLimitMap = new Map<string, number[]>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const hits = rateLimitMap.get(ip) ?? [];
+  const recent = hits.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    rateLimitMap.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  rateLimitMap.set(ip, recent);
+  return true;
+}
+
 export async function POST(req: Request) {
   try {
+    // Per-IP rate limit sebelum body parsing
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      req.headers.get("x-real-ip") ??
+      "unknown";
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      );
+    }
+
     const body = await req.json();
     const { orderId } = body;
 
@@ -26,6 +62,10 @@ export async function POST(req: Request) {
         { error: "orderId tidak valid" },
         { status: 400 },
       );
+    }
+
+    if (!ORDER_ID_PATTERN.test(orderId)) {
+      return NextResponse.json({ error: "Invalid orderId" }, { status: 400 });
     }
 
     const serverKey = process.env.MIDTRANS_SERVER_KEY || "";
@@ -76,11 +116,9 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({
-      status: newFirestoreStatus,
-      midtransTransactionStatus: data.transaction_status,
-      fraud_status: data.fraud_status || null,
-    });
+    // Minimal contract: hanya `status` yang dikembalikan ke caller.
+    // midtransTransactionStatus / fraud_status hanya untuk internal Firestore.
+    return NextResponse.json({ status: newFirestoreStatus });
   } catch (err: any) {
     console.error("[CheckStatus] Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
