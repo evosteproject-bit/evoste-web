@@ -56,6 +56,9 @@ next-env.d.ts
 .firebase/
 .dataconnect/
 .vercel/
+# Service account JSON (server-side credentials, JANGAN PERNAH commit)
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
 
 # Catatan: Biarkan .firebaserc terkomentar jika Anda bekerja dalam tim 
 # agar deploy mengarah ke proyek yang sama.

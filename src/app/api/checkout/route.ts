@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { doc, serverTimestamp, runTransaction } from "firebase/firestore";
-import { db } from "@/services/firebaseConfig";
+import { FieldValue } from "firebase-admin/firestore";
+import { getAdminDb } from "@/services/firebaseAdmin";
 import Midtrans from "midtrans-client";
 
 const snap = new Midtrans.Snap({
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Konversi paksa ID Pesanan menjadi String
+    // 1. Paksa ID Pesanan menjadi String
     const safeOrderId = String(orderId);
 
     const grossAmount = cart.reduce((acc: number, item: any) => {
@@ -29,24 +29,25 @@ export async function POST(req: Request) {
       return acc + price * (item.quantity || 1);
     }, 0);
 
-    // Eksekusi Blok Transaksi Firestore
-    await runTransaction(db, async (transaction) => {
-      // 2. Konversi paksa ID Produk menjadi String pada Fase Pembacaan
+    // 2. Transaksi Firestore via Admin SDK (bypass rules)
+    //    Stock validation & decrement dilakukan secara atomic di server.
+    const adminDb = getAdminDb();
+    await adminDb.runTransaction(async (transaction) => {
       const productRefs = cart.map((item: any) =>
-        doc(db, "products", String(item.id)),
+        adminDb.collection("products").doc(String(item.id)),
       );
       const productDocs = await Promise.all(
         productRefs.map((ref) => transaction.get(ref)),
       );
 
-      // Fase Validasi Ketat
+      // Validasi ketat
       productDocs.forEach((pDoc, index) => {
-        if (!pDoc.exists()) {
+        if (!pDoc.exists) {
           throw new Error(
             `Produk "${cart[index].name}" sudah tidak tersedia atau telah dihapus dari katalog utama.`,
           );
         }
-        const currentStock = pDoc.data().stock;
+        const currentStock = pDoc.data()?.stock ?? 0;
         const requestedQty = cart[index].quantity || 1;
 
         if (currentStock < requestedQty) {
@@ -56,29 +57,28 @@ export async function POST(req: Request) {
         }
       });
 
-      // Fase Penulisan (Potong Stok)
+      // Potong stok
       productDocs.forEach((pDoc, index) => {
-        const currentStock = pDoc.data().stock;
+        const currentStock = pDoc.data()?.stock ?? 0;
         const requestedQty = cart[index].quantity || 1;
         transaction.update(productRefs[index], {
           stock: currentStock - requestedQty,
         });
       });
 
-      // Fase Pembuatan Dokumen Pesanan
-      const orderRef = doc(db, "orders", safeOrderId);
+      // Buat dokumen pesanan
+      const orderRef = adminDb.collection("orders").doc(safeOrderId);
       transaction.set(orderRef, {
         orderId: safeOrderId,
         cart: cart,
         customerDetails: customerDetails,
         status: "pending",
         grossAmount: grossAmount,
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
     });
 
-    // Permintaan Token Midtrans Snap
-    // Tentukan base URL untuk return URL setelah pembayaran
+    // 3. Permintaan Token Midtrans Snap
     const baseUrl =
       req.headers.get("origin") ||
       req.headers.get("referer")?.replace(/\/$/, "") ||
@@ -95,7 +95,6 @@ export async function POST(req: Request) {
         email: customerDetails.email,
         phone: customerDetails.phone,
       },
-      // URL kembali setelah pembayaran (untuk flow redirect)
       callbacks: {
         finish: `${baseUrl}/checkout/success`,
         unfinish: `${baseUrl}/checkout/pending`,
@@ -111,7 +110,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Checkout API Error:", error);
-    // Kembalikan pesan yang jelas ke antarmuka klien
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
