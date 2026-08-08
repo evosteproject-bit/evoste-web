@@ -42,7 +42,7 @@ export default function HistorySection() {
         <div className="space-y-36 relative before:content-[''] before:absolute before:left-1/2 before:-translate-x-1/2 before:top-0 before:bottom-0 before:w-1 before:bg-gray-200 dark:before:bg-gray-700">
           <TimelineEvent year="2000" title="A Timeless Beginning">
             The story began with a vision to create perfumes that are more than
-            just scents they are timeless legacies. EVOSTE was born to redefine
+            just scents they are timeless legacies. ANDI was born to redefine
             how fragrance captures emotion and memory.
           </TimelineEvent>
           <TimelineEvent year="2008" title="Crafting with Soul">

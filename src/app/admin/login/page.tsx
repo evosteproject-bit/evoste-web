@@ -57,7 +57,7 @@ export default function AdminLogin() {
           transition={{ duration: 0.4 }}
         >
           <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight">
-            E-VOSTE
+            ANDI
           </h2>
           <p className="mt-2 text-center text-sm text-white font-medium">
             Sistem Manajemen Terpadu
@@ -101,7 +101,7 @@ export default function AdminLogin() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 transition-colors"
-                  placeholder="admin@evoste.com"
+                  placeholder="admin@andi.com"
                 />
               </div>
             </div>

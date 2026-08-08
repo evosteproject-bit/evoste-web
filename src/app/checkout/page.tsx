@@ -157,7 +157,17 @@ export default function CheckoutPage() {
             router.push("/checkout/failed");
           },
           onClose: function () {
-            setLoading(false);
+            // User menutup popup Midtrans tanpa menyelesaikan pembayaran.
+            // Pesanan sudah dibuat di Firestore (status: pending). Arahkan
+            // user ke /checkout/pending supaya mereka bisa lanjut bayar atau
+            // lihat detail pesanan — konsisten dengan flow redirect_url yang
+            // juga mengirim user ke sini via callback 'unfinish'.
+            const baseUrl = window.location.origin;
+            const orderIdLS = localStorage.getItem("latest_order_id");
+            const qs = orderIdLS
+              ? `?orderId=${encodeURIComponent(orderIdLS)}&token=${data.token}`
+              : `?token=${data.token}`;
+            router.push(`${baseUrl}/checkout/pending${qs}`);
           },
         });
       } else {

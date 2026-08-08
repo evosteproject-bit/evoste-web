@@ -14,7 +14,7 @@ interface Message {
 }
 
 const SUGGESTED_PROMPTS = [
-  "Apa itu EVOSTE?",
+  "Apa itu ANDI?",
   "Rekomendasi parfum untuk sehari-hari",
   "Parfum apa yang cocok untuk malam hari?",
   "Berapa harga Ivory Bloom?",
@@ -25,7 +25,7 @@ const initialMessages: Message[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "Halo! 👋 Saya Evoste Assistant. Ada yang bisa saya bantu tentang koleksi parfum EVOSTE hari ini?",
+      "Halo! 👋 Saya Andie Assistant. Ada yang bisa saya bantu tentang koleksi parfum ANDI hari ini?",
   },
 ];
 
@@ -178,7 +178,7 @@ export default function ChatbotWidget() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm font-orbitron tracking-wide">
-                    EVOSTE ASSISTANT
+                    ANDI ASSISTANT
                   </h3>
                   <p className="text-xs text-cyan-100 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse" />

@@ -19,6 +19,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
         request.resource.data.stock <= resource.data.stock;
 
+      // Admin boleh update semua field (nama, harga, stok, deskripsi, gambar)
+      allow update: if isAdmin();
+
       // Create/delete tetap admin
       allow create, delete: if isAdmin();
     }

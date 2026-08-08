@@ -25,7 +25,7 @@ export default function AboutSection() {
           >
             <Image
               src="/about.png"
-              alt="About EVOSTE"
+              alt="About ANDI"
               fill
               className="object-cover"
             />
@@ -38,7 +38,7 @@ export default function AboutSection() {
               viewport={{ once: true }}
             >
               <h3 className="text-3xl font-bold mb-4 dark:text-white">
-                EVOSTE Vision
+                ANDI Vision
               </h3>
               <p className="text-lg leading-relaxed">
                 Every drop holds a story. A scent is more than aroma it is

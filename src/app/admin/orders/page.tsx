@@ -145,7 +145,9 @@ export default function AdminOrdersPage() {
         `Pesanan berhasil diperbarui ke tahap: ${nextInfo.nextStatus.toUpperCase()}`,
       );
     } catch (error) {
-      alert("Terjadi kesalahan saat memperbarui status pesanan.");
+      console.error("Order update error:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`Gagal update pesanan: ${msg}`);
     } finally {
       setIsProcessing(false);
     }

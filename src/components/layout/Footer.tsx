@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="py-10 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-orbitron border-t border-gray-200 dark:border-cyan-500/50 transition-colors duration-300">
       <div className="container mx-auto px-6 max-w-7xl text-center">
         <p className="mb-6 text-xl font-black text-blue-600 dark:text-cyan-200">
-          EVOSTE
+          ANDI
         </p>
         <div className="flex justify-center space-x-8 mb-6 text-sm">
           <a
@@ -44,7 +44,7 @@ export default function Footer() {
           </a>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-500">
-          &copy; {new Date().getFullYear()} EVOSTE - ANDI ALFIAN.
+          &copy; {new Date().getFullYear()} ANDI ALFIAN.
         </p>
       </div>
     </footer>

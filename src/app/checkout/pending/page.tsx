@@ -9,20 +9,21 @@ function PendingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Mencari token dari URL atau LocalStorage
+  // Order ID + token dari URL Midtrans (callback 'unfinish' membawa orderId)
+  // atau localStorage (di-set oleh /checkout saat membuat pesanan).
+  const orderId =
+    searchParams.get("orderId") ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem("latest_order_id")
+      : null);
+
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Ambil token dari URL jika ada
     const urlToken = searchParams.get("token");
-    // Ambil token dari storage sebagai cadangan
     const storedToken = localStorage.getItem("latest_snap_token");
-
     setToken(urlToken || storedToken);
-
-    // Catatan: snap.js sudah di-load global di layout.tsx (strategy="beforeInteractive"),
-    // tidak perlu injeksi manual di sini.
   }, [searchParams]);
 
   const handleResumePayment = () => {
@@ -33,12 +34,10 @@ function PendingContent() {
     if (snap) {
       snap.pay(token, {
         onSuccess: () => {
-          localStorage.removeItem("latest_snap_token"); // Bersihkan setelah sukses
+          localStorage.removeItem("latest_snap_token");
           const orderIdQS =
             searchParams.get("orderId") ??
-            (typeof window !== "undefined"
-              ? localStorage.getItem("latest_order_id")
-              : null);
+            localStorage.getItem("latest_order_id");
           router.push(
             orderIdQS
               ? `/checkout/success?orderId=${encodeURIComponent(orderIdQS)}`
@@ -58,7 +57,7 @@ function PendingContent() {
       animate={{ opacity: 1, scale: 1 }}
       className="max-w-md w-full bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-700 text-center"
     >
-      <div className="w-20 h-20 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-8">
+      <div className="w-20 h-20 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
         <svg
           className="w-10 h-10 text-amber-600 dark:text-amber-400"
           fill="none"
@@ -74,17 +73,27 @@ function PendingContent() {
         </svg>
       </div>
 
-      <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 font-orbitron tracking-tight text-center">
-        PAYMENT PENDING
+      <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-3 font-orbitron tracking-tight">
+        PEMBAYARAN BELUM SELESAI
       </h1>
 
-      <p className="text-gray-600 dark:text-gray-400 mb-10 leading-relaxed text-center">
-        Instruksi pembayaran telah dikirim. Jika Anda tidak sengaja menutup
-        jendela pembayaran, silakan klik tombol di bawah.
+      <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+        Pesanan Anda sudah kami catat dengan status <strong>Belum Bayar</strong>.
+        Silakan selesaikan pembayaran untuk melanjutkan proses pesanan.
       </p>
 
-      <div className="space-y-4">
-        {/* Tombol akan muncul karena token sekarang berhasil diambil dari localStorage */}
+      {orderId && (
+        <div className="bg-gray-50 dark:bg-slate-900/50 rounded-xl px-4 py-3 mb-6 border border-gray-100 dark:border-slate-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">
+            ORDER ID
+          </p>
+          <p className="text-sm font-bold text-gray-900 dark:text-white font-mono break-all">
+            {orderId}
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-3">
         {token && (
           <button
             onClick={handleResumePayment}
@@ -97,11 +106,20 @@ function PendingContent() {
           </button>
         )}
 
+        {orderId && (
+          <Link
+            href={`/orders/${orderId}`}
+            className="block w-full py-4 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-slate-600 rounded-xl font-bold transition-all text-center"
+          >
+            Lihat Detail Pesanan
+          </Link>
+        )}
+
         <Link
-          href="/"
-          className="block w-full py-4 bg-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 font-semibold transition-all text-center"
+          href="/orders"
+          className="block w-full py-3 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-cyan-400 font-semibold text-center transition-colors"
         >
-          Kembali ke Beranda
+          Lihat Semua Pesanan Saya
         </Link>
       </div>
     </motion.div>

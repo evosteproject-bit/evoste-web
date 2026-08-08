@@ -294,83 +294,101 @@ export default function OrdersPage() {
                   key={order.id}
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden"
                 >
-                  <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">
-                        ORDER ID
-                      </p>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white font-mono">
-                        {order.orderId}
-                      </p>
+                  <div
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => router.push(`/orders/${order.orderId}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/orders/${order.orderId}`);
+                      }
+                    }}
+                    className="block bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-300 dark:hover:border-cyan-500/50 transition-all cursor-pointer"
+                  >
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">
+                          ORDER ID
+                        </p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                          {order.orderId}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {formatDate(order.createdAt)}
+                        </p>
+                        {renderStatusBadge(order.status)}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatDate(order.createdAt)}
-                      </p>
-                      {renderStatusBadge(order.status)}
-                    </div>
-                  </div>
 
-                  <div className="p-6 border-b border-gray-100 dark:border-slate-700">
-                    <div className="space-y-4">
-                      {order.cart.map((item, index) => (
-                        <div key={index} className="flex items-center gap-4">
-                          <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800">
-                            <img
-                              src={item.image || "/logo.jpeg"}
-                              alt={item.name}
-                              className="object-contain w-full h-full absolute inset-0 p-1"
-                              onError={(e) => {
-                                e.currentTarget.src = "/logo.jpeg";
-                              }}
-                            />
+                    <div className="p-6 border-b border-gray-100 dark:border-slate-700">
+                      <div className="space-y-4">
+                        {order.cart.map((item, index) => (
+                          <div key={index} className="flex items-center gap-4">
+                            <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 dark:bg-slate-800">
+                              <img
+                                src={item.image || "/logo.jpeg"}
+                                alt={item.name}
+                                className="object-contain w-full h-full absolute inset-0 p-1"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/logo.jpeg";
+                                }}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                                {item.name}
+                              </h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {item.quantity || 1} x Rp{" "}
+                                {formatIDR(
+                                  Number(
+                                    String(item.price).replace(/\./g, ""),
+                                  ),
+                                )}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 dark:text-white">
-                              {item.name}
-                            </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {item.quantity || 1} x Rp{" "}
-                              {formatIDR(
-                                Number(String(item.price).replace(/\./g, "")),
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 dark:bg-slate-900/30">
-                    <div className="text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">
-                        Total Belanja:{" "}
-                      </span>
-                      <span className="text-lg font-black text-blue-600 dark:text-cyan-400">
-                        Rp {formatIDR(calculateTotal(order.cart))}
-                      </span>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="w-full sm:w-auto flex gap-3 justify-end">
-                      {getCategoryStatus(order.status) === "shipped" && (
-                        <button
-                          onClick={() => handleCompleteOrder(order.id)}
-                          disabled={isProcessing}
-                          className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-50"
-                        >
-                          Pesanan Diterima
-                        </button>
-                      )}
-                      {getCategoryStatus(order.status) === "pending" && (
-                        <Link
-                          href={`/checkout`}
-                          className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-colors text-center"
-                        >
-                          Lanjut Bayar
-                        </Link>
-                      )}
+                    <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 dark:bg-slate-900/30">
+                      <div className="text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Total Belanja:{" "}
+                        </span>
+                        <span className="text-lg font-black text-blue-600 dark:text-cyan-400">
+                          Rp {formatIDR(calculateTotal(order.cart))}
+                        </span>
+                      </div>
+
+                      <div className="w-full sm:w-auto flex gap-3 justify-end">
+                        {getCategoryStatus(order.status) === "shipped" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCompleteOrder(order.id);
+                            }}
+                            disabled={isProcessing}
+                            className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-50"
+                          >
+                            Pesanan Diterima
+                          </button>
+                        )}
+                        {getCategoryStatus(order.status) === "pending" && (
+                          <Link
+                            href="/checkout"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-colors text-center"
+                          >
+                            Lanjut Bayar
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
