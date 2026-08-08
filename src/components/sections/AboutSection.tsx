@@ -6,7 +6,7 @@ import SectionContainer from "@/components/layout/SectionContainer";
 
 export default function AboutSection() {
   return (
-    <SectionContainer id="about" title="About Us" isAlternate={true}>
+    <SectionContainer id="about" title="Tentang Saya" isAlternate={true}>
       <div
         className="relative rounded-3xl overflow-hidden"
         style={{
@@ -25,7 +25,7 @@ export default function AboutSection() {
           >
             <Image
               src="/about.png"
-              alt="About ANDI"
+              alt="Alfian Parfume"
               fill
               className="object-cover"
             />
@@ -37,13 +37,14 @@ export default function AboutSection() {
               transition={{ delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <h3 className="text-3xl font-bold mb-4 dark:text-white">
-                ANDI Vision
+              <h3 className="text-2xl md:text-3xl font-bold mb-4 dark:text-white">
+                Halo, saya Andi Alfian 👋
               </h3>
-              <p className="text-lg leading-relaxed">
-                Every drop holds a story. A scent is more than aroma it is
-                memory woven into the soul. Guided by the vision “Be Timeless.
-                Crafted Your Scent Legacy,” each creation is born to last.
+              <p className="text-base md:text-lg leading-relaxed">
+                Saya menjalankan Alfian Parfume sebagai reseller parfum
+                personal. Fokus saya adalah menjual parfum original — termasuk
+                membawa koleksi Evoste — dengan pelayanan yang bisa langsung
+                diajak diskusi soal wangi, occasion, atau budget.
               </p>
             </motion.div>
             <motion.div
@@ -51,16 +52,32 @@ export default function AboutSection() {
               whileInView={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
               viewport={{ once: true }}
+              className="grid sm:grid-cols-3 gap-4 pt-2"
             >
-              <p className="text-lg leading-relaxed border-l-4 border-blue-500 dark:border-cyan-500 pl-4 italic">
-                Crafted with artistry, every note becomes a chapter of life’s
-                journey. From fleeting moments to eternal impressions, it
-                preserves what words cannot. Each layer is composed with
-                harmony, precision, and depth that endures. It is a silent
-                language of presence, confidence, and individuality. Not just to
-                be worn, but to be lived and remembered. An invitation to leave
-                traces that time itself cannot erase.
-              </p>
+              <div className="bg-white/60 dark:bg-slate-800/60 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
+                <p className="text-2xl font-black text-blue-600 dark:text-cyan-400">
+                  100%
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                  Original
+                </p>
+              </div>
+              <div className="bg-white/60 dark:bg-slate-800/60 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
+                <p className="text-2xl font-black text-blue-600 dark:text-cyan-400">
+                  Personal
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                  Service
+                </p>
+              </div>
+              <div className="bg-white/60 dark:bg-slate-800/60 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
+                <p className="text-2xl font-black text-blue-600 dark:text-cyan-400">
+                  Chat
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                  Ready
+                </p>
+              </div>
             </motion.div>
           </div>
         </div>

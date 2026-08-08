@@ -21,7 +21,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "ANDI",
+  title: "Alfian Parfume",
   description:
     "Fragrance is more than a scent, it is a story, a memory, and a signature. Each creation is made to define you, to be remembered, and to leave an unforgettable trace.",
   icons: {

@@ -206,7 +206,7 @@ export default function Header({ showCartNotification }: HeaderProps) {
           }}
           className="text-2xl font-black tracking-widest text-blue-600 dark:text-cyan-300 font-orbitron"
         >
-          ANDIPARFUME
+          ALFIAN PARFUME
         </Link>
 
         <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-700 dark:text-gray-300">

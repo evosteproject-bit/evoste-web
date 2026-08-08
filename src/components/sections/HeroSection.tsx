@@ -17,15 +17,16 @@ export default function HeroSection() {
           transition={{ duration: 0.8 }}
           className="text-6xl md:text-8xl font-black mb-4 text-gray-900 dark:text-white drop-shadow-lg"
         >
-          EVOSTE
+          ALFIAN PARFUME
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-xl md:text-3xl font-light text-blue-600 dark:text-cyan-200 tracking-widest mb-8"
+          className="text-base md:text-xl font-light text-blue-600 dark:text-cyan-200 tracking-widest mb-8 max-w-3xl mx-auto"
         >
-          Be Timeless Crafted Your Scent Legacy
+          Personal perfume collection · Reseller koleksi Evoste & parfum
+          pilihan
         </motion.p>
         <motion.a
           href="#catalog"

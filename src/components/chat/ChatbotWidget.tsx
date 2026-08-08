@@ -14,7 +14,7 @@ interface Message {
 }
 
 const SUGGESTED_PROMPTS = [
-  "Apa itu ANDI?",
+  "Apa itu Alfian Parfume?",
   "Rekomendasi parfum untuk sehari-hari",
   "Parfum apa yang cocok untuk malam hari?",
   "Berapa harga Ivory Bloom?",
@@ -25,7 +25,7 @@ const initialMessages: Message[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "Halo! 👋 Saya Andie Assistant. Ada yang bisa saya bantu tentang koleksi parfum ANDI hari ini?",
+      "Halo! 👋 Saya asisten Alfian Parfume. Lagi cari wangi untuk occasion tertentu, atau mau tanya koleksi yang ready? Langsung tanya aja.",
   },
 ];
 
@@ -178,7 +178,7 @@ export default function ChatbotWidget() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm font-orbitron tracking-wide">
-                    ANDI ASSISTANT
+                    ALFIAN PARFUME ASSISTANT
                   </h3>
                   <p className="text-xs text-cyan-100 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse" />

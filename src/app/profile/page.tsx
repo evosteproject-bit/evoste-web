@@ -122,7 +122,7 @@ export default function UserProfilePage() {
                   </div>
                   <div className="text-center">
                     <h3 className="font-bold text-gray-900 dark:text-white">
-                      {formData.name || "Pengguna ANDI"}
+                      {formData.name || "Pelanggan Alfian Parfume"}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                       Akun Pelanggan

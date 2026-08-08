@@ -77,7 +77,7 @@ export default function AdminLayout({
         <aside className="w-64 bg-gray-800 border-r border-gray-700 hidden md:flex flex-col">
           <div className="h-20 flex items-center px-9 border-b border-gray-700">
             <h1 className="text-xl font-black tracking-widest text-cyan-400 font-orbitron">
-              ANDI
+              ALFIAN PARFUME
             </h1>
           </div>
           <nav className="flex-1 py-6 px-4 space-y-2">

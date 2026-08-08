@@ -96,7 +96,7 @@ export default function AdminProfilePage() {
               {formData.name ? formData.name.charAt(0) : "A"}
             </div>
             <h3 className="text-xl font-bold text-white mb-1">
-              {formData.name || "Admin ANDI"}
+              {formData.name || "Admin Alfian Parfume"}
             </h3>
             <p className="text-sm text-gray-400 mb-4">{formData.email}</p>
             <span className="px-3 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-full text-xs font-bold uppercase tracking-wider">

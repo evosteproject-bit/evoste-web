@@ -57,7 +57,7 @@ export default function AdminLogin() {
           transition={{ duration: 0.4 }}
         >
           <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight">
-            ANDI
+            ALFIAN PARFUME
           </h2>
           <p className="mt-2 text-center text-sm text-white font-medium">
             Sistem Manajemen Terpadu

@@ -4,7 +4,7 @@ export default function Loading() {
       <div className="flex flex-col items-center gap-5">
         <div className="w-14 h-14 border-4 border-blue-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-bold tracking-widest text-gray-500 dark:text-cyan-300 font-orbitron animate-pulse">
-          ANDI...
+          ALFIAN PARFUME...
         </p>
       </div>
     </div>
