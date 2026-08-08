@@ -152,13 +152,30 @@ export default function ShopSection() {
                     // Lebar kartu statis untuk menjamin bentuk korsel
                     className="group min-w-[85vw] sm:min-w-[300px] max-w-[85vw] sm:max-w-[300px] snap-center shrink-0 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 dark:hover:shadow-cyan-500/10 border border-gray-100 dark:border-slate-700 transition-all duration-300 flex flex-col h-full"
                   >
-                    <div className="relative w-full aspect-square mb-6 bg-gray-50 dark:bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+                    <div className="relative w-full aspect-square mb-6 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl overflow-hidden flex items-center justify-center p-4">
                       <img
                         src={product.image || "/logo.jpeg"}
                         alt={product.name}
                         className={`object-contain w-full h-full absolute inset-0 p-4 transition-transform duration-500 group-hover:scale-110 ${isOutOfStock ? "opacity-50 grayscale" : ""}`}
                         onError={(e) => {
                           e.currentTarget.src = "/logo.jpeg";
+                        }}
+                      />
+                      {/* Overlay untuk menutupi branding lawas di botol foto */}
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background:
+                            "linear-gradient(180deg, rgba(255,255,255,0.0) 25%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.45) 70%, rgba(255,255,255,0.0) 90%)",
+                        }}
+                      />
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 pointer-events-none hidden dark:block"
+                        style={{
+                          background:
+                            "linear-gradient(180deg, rgba(15,23,42,0.0) 25%, rgba(15,23,42,0.7) 45%, rgba(15,23,42,0.92) 55%, rgba(15,23,42,0.6) 70%, rgba(15,23,42,0.0) 90%)",
                         }}
                       />
                       {isOutOfStock && (

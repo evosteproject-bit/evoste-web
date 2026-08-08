@@ -7,15 +7,8 @@ import SectionContainer from "@/components/layout/SectionContainer";
 export default function AboutSection() {
   return (
     <SectionContainer id="about" title="Tentang Saya" isAlternate={true}>
-      <div
-        className="relative rounded-3xl overflow-hidden"
-        style={{
-          backgroundImage: "url('/home2.png')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm" />
+      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-100 via-white to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950 border border-blue-100 dark:border-cyan-500/20">
+        <div className="absolute inset-0 backdrop-blur-sm" />
         <div className="relative grid md:grid-cols-3 gap-12 items-center text-gray-700 dark:text-gray-300 p-8 md:p-16">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}

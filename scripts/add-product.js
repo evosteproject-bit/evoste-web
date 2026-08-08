@@ -44,20 +44,20 @@ if (!API_KEY || !PROJECT_ID) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// EDIT DATA PRODUK DI BAWAH INI SESUAI KEBUTUHAN
+// DATA PRODUK — Alfian Parfume signature pick
+// Bukan lini Evoste. Bisa diedit setelah di-seed via admin dashboard.
 // ──────────────────────────────────────────────────────────────
 const NEW_PRODUCT = {
-  // id Firestore doc — biarkan auto kalau mau, atau isi manual
-  id: "mystic-rose-50ml",
-  name: "Mystic Rose 50ml",
+  id: "signature-noir-50ml",
+  name: "Signature Noir 50ml",
   description:
-    "Eau de Parfum 50ml dengan karakter floral oriental yang hangat. Cocok untuk acara malam atau kencan. Reseller Alfian Parfume — bukan official Evoste.",
-  price: 350000,
-  stock: 10,
-  image: "/products/mystic-rose.png",
-  category: "Eau de Parfum",
+    "Edisi Signature Alfian Parfume — karakter bold, woody-amber dengan sentuhan vanila smoky. Pilihan Andi untuk acara formal maupun malam yang berkesan. Bukan lini Evoste; diracik khusus untuk koleksi pribadi reseller Alfian Parfume.",
+  price: 425000,
+  stock: 12,
+  image: "/products/signature-noir.png",
+  category: "Signature",
   size: "50ml",
-  tags: ["floral", "oriental", "wanita", "malam"],
+  tags: ["signature", "woody", "amber", "unisex", "reseller-exclusive"],
 };
 // ──────────────────────────────────────────────────────────────
 

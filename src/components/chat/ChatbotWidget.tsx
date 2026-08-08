@@ -17,7 +17,7 @@ const SUGGESTED_PROMPTS = [
   "Apa itu Alfian Parfume?",
   "Rekomendasi parfum untuk sehari-hari",
   "Parfum apa yang cocok untuk malam hari?",
-  "Berapa harga Ivory Bloom?",
+  "Berapa harga Signature Noir?",
 ];
 
 const initialMessages: Message[] = [
